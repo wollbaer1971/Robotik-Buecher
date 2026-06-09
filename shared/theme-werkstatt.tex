@@ -94,6 +94,16 @@
   fonttitle=\sffamily\bfseries,
   title=Analogie,#1}
 
+\definecolor{ProjektFarbe}{HTML}{E8F5E9}
+\definecolor{ProjektRahmen}{HTML}{2E7D32}
+
+\newtcolorbox{projektBox}{
+  enhanced, breakable,
+  colback=ProjektFarbe, colframe=ProjektRahmen,
+  boxrule=1pt,
+  fonttitle=\sffamily\bfseries,
+  title={\texttt{robotik-uno-q} -- Projektstand}}
+
 \newcommand{\kapitelziel}[1]{%
   \begin{tcolorbox}[
     colback=white, colframe=WerkstattBlau,
