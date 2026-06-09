@@ -2,330 +2,350 @@
 \part{Mit Textdateien und Skripten arbeiten}
 % ============================================================
 
-% ── Kapitel 8 ────────────────────────────────────────────────
 \chapter{Wir wollen eine Konfigurationsdatei bearbeiten}
 
 \kapitelziel{
-Du kannst Textdateien im Terminal bearbeiten und verstehst das
-YAML-Format, das in ROS2 überall eingesetzt wird.
+Du erstellst die Sensor-Konfiguration für robotik-uno-q
+in YAML und kannst sie im Terminal bearbeiten.
 }
 \kapitelstruktur
 
 \section{Situation}
-Der ROS2-Node startet, aber die Kamera-Auflösung stimmt nicht.
-Die Einstellung steckt in einer YAML-Datei -- die musst du öffnen
-und ändern.
+
+\texttt{sensor\_bridge.py} hat zurzeit den Schwellenwert
+für den Sicherheitsabstand hart im Code stehen:
+\texttt{MIN\_ABSTAND = 0.20}. Wenn du ihn ändern willst,
+musst du jedes Mal den Python-Code öffnen.
+
+Das ist unprofessionell -- und gefährlich.
+Ein Konfigurationsfehler soll nie den Code berühren müssen.
 
 \begin{aufgabeBox}
-Öffne eine Konfigurationsdatei im Terminal, verstehe ihr Format
-und speichere eine Änderung.
+Erstelle \texttt{stufe2\_ros2/config/sensor\_config.yaml}
+mit den HC-SR04-Parametern des Roboters und
+binde die Konfiguration in \texttt{sensor\_bridge.py} ein.
 \end{aufgabeBox}
 
 \begin{problemBox}
-Grafische Editoren sind auf Robotern oft nicht verfügbar.
-Wer nur GUI-Editoren kennt, steht vor einem verschlossenen System.
+YAML ist einrückungsbasiert -- ein einzelnes falsches Leerzeichen
+macht die gesamte Datei ungültig. Und Tab-Einrückung
+ist in YAML verboten.
 \end{problemBox}
 
-\begin{wissenBox}
-Wir brauchen: \texttt{nano} als einfachen Terminal-Editor, das
-YAML-Format und den Umgang mit \texttt{.bashrc}.
-\end{wissenBox}
+\begin{haubeBox}
+\textbf{Warum Konfiguration von Code trennen?}
 
-\section{Der pragmatische Weg}
+Derselbe Code soll auf verschiedenen Robotern laufen.
+Roboter~A hat Sensoren mit 2\,m Reichweite, Roboter~B mit 4\,m.
+Wenn die Reichweite im Code steht, brauchst du für jeden
+Roboter eine eigene Code-Version.
+Wenn sie in einer Konfigurationsdatei steht, reicht eine
+andere \texttt{.yaml}-Datei -- der Code bleibt identisch.
 
-\begin{lstlisting}[style=bash]
-# nano: einfachster Terminal-Editor
-nano kamera_config.yaml
+Das ist das Prinzip hinter ROS2-Parametern,
+Docker-Compose-Umgebungsvariablen und
+Linux-Systemkonfigurationsdateien in \texttt{/etc/}.
+Überall dasselbe Muster: Code = Logik, Konfiguration = Daten.
+\end{haubeBox}
 
-# Steuerung in nano:
-# Strg+O : Speichern
-# Strg+X : Beenden
-# Strg+K : Zeile ausschneiden
-# Strg+U : Einfuegen
-# Strg+W : Suchen
-\end{lstlisting}
+\section{Die Sensor-Konfiguration}
 
 \begin{lstlisting}[style=yaml]
-# kamera_config.yaml -- YAML-Beispiel
-kamera:
-  aufloesung:
-    breite: 1920
-    hoehe: 1080
-  bildrate: 30
-  format: "RGB8"
+# stufe2_ros2/config/sensor_config.yaml
+# Konfiguration fuer HC-SR04 Ultraschall-Sensoren
+# Hardware: robotik-uno-q mit Arduino UNO Q / UNO R3
 
-roboter:
-  name: "MobileRobot-1"
-  max_geschwindigkeit: 0.5
-  sicherheitsabstand: 0.25
+sensoren:
+  ultraschall_rechts:
+    trigger_pin: 3     # D3 am Arduino (aus hinderniserkennung.ino)
+    echo_pin: 4        # D4 am Arduino
+    max_abstand_m: 4.0
+    einheit: "meter"
+
+  ultraschall_links:
+    trigger_pin: 9     # D9 am Arduino
+    echo_pin: 10       # D10 am Arduino
+    max_abstand_m: 4.0
+    einheit: "meter"
+
+sicherheit:
+  min_abstand_m: 0.25    # Stopp-Schwellenwert
+  warn_abstand_m: 0.50   # Warnungs-Schwellenwert
+
+serial:
+  baudrate: 9600
+  timeout_s: 1.0
+  encoding: "utf-8"
 \end{lstlisting}
 
 \begin{loesungBox}
 \begin{lstlisting}[style=bash]
-# Datei sichern, dann bearbeiten
-cp kamera_config.yaml kamera_config.yaml.bak
-nano kamera_config.yaml
-# Aenderung vornehmen: bildrate: 30 -> bildrate: 60
-# Strg+O, Enter (speichern)
-# Strg+X (beenden)
+cd ~/robotik-uno-q/stufe2_ros2
+nano config/sensor_config.yaml
+# Inhalt eingeben (siehe oben)
+# Strg+O Enter (speichern), Strg+X (beenden)
 
-# Aenderung pruefen
-diff kamera_config.yaml kamera_config.yaml.bak
+# Validieren:
+python3 -c "import yaml; print(yaml.safe_load(open('config/sensor_config.yaml')))"
+\end{lstlisting}
+
+Einbinden in \texttt{sensor\_bridge.py}:
+\begin{lstlisting}[style=python]
+#!/usr/bin/env python3
+# stufe2_ros2/src/sensor_bridge.py -- Version 0.2
+import yaml
+
+with open('../config/sensor_config.yaml') as f:
+    config = yaml.safe_load(f)
+
+min_abstand = config['sicherheit']['min_abstand_m']
+baudrate    = config['serial']['baudrate']
+
+print(f"[sensor_bridge] Konfiguration geladen.")
+print(f"  Min-Abstand: {min_abstand} m")
+print(f"  Baudrate:    {baudrate}")
 \end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} \texttt{src/sensor\_bridge.py} mit hartem Schwellenwert.\\
+\textbf{Heute:} \texttt{config/sensor\_config.yaml} erstellt,
+Konfiguration ausgelagert, YAML-Syntax gelernt.\\
+\textbf{Nächstes Kapitel:} Startskript schreiben.
+\end{projektBox}
+
 \begin{merksatzBox}
-YAML ist einrückungsbasiert -- Leerzeichen statt Tabs!
-Ein falsches Leerzeichen macht die ganze Datei ungültig.
-Kommentare beginnen mit \texttt{\#}. Zeichenketten brauchen
-meist keine Anführungszeichen -- es sei denn, sie enthalten Sonderzeichen.
+YAML-Regeln: Einrückung nur mit Leerzeichen (nie Tabs).
+Doppelpunkt mit Leerzeichen danach: \texttt{key: value}.
+Listen mit Bindestrich: \texttt{- item}.
+Kommentare mit \texttt{\#}.
 \end{merksatzBox}
 
 \begin{fehlerBox}
 \begin{itemize}
-  \item \textbf{Tabs in YAML:} YAML erlaubt keine Tabs als Einrückung.
-  \item \textbf{Falsche Einrückung:} \texttt{yaml.scanner.ScannerError} ist oft ein Einrückfehler.
-  \item \textbf{nano vergessen:} \texttt{Strg+C} beendet nano \textbf{nicht} -- \texttt{Strg+X} schon.
+  \item \textbf{Tab-Einrückung:} \texttt{yaml.scanner.ScannerError}
+        -- oft durch Copy-Paste aus einem Editor mit Tabs.
+  \item \textbf{Fehlender Doppelpunkt-Abstand:}
+        \texttt{key:value} ist falsch, \texttt{key: value} ist richtig.
 \end{itemize}
 \end{fehlerBox}
 
-\begin{uebungBox}
-Erstelle mit \texttt{nano} eine Datei \texttt{roboter.yaml} mit mindestens
-drei Konfigurationsparametern (Name, Geschwindigkeit, Sensoren als Liste).
-Validiere sie mit \texttt{python3 -c "import yaml; yaml.safe\_load(open('roboter.yaml'))"}.
-\end{uebungBox}
-
-\begin{quizBox}
-\begin{enumerate}
-  \item Wie speichert man in nano?
-  \item Darf YAML Tabs zur Einrückung verwenden?
-  \item Was bedeutet \texttt{\#} in einer YAML-Datei?
-\end{enumerate}
-\textbf{Antworten:} 1. Strg+O, dann Enter. 2. Nein, nur Leerzeichen.
-3. Kommentarzeichen -- Rest der Zeile wird ignoriert.
-\end{quizBox}
-
-\begin{haubeBox}
-\textbf{vim}: Wer häufig auf Servern arbeitet, lohnt sich vim zu lernen.
-Grundprinzip: Modus-basiert. \texttt{i} = Eingabemodus, \texttt{Esc} = Befehlsmodus,
-\texttt{:wq} = Speichern und Beenden. Einmal gelernt, extrem schnell.
-\end{haubeBox}
-
 \begin{robotikBox}
-ROS2-Parameter werden in YAML-Dateien gespeichert und beim Start
-eines Nodes übergeben:
+ROS2-Parameter werden in YAML-Dateien gespeichert und beim
+Node-Start übergeben:
 \begin{lstlisting}[style=bash]
-ros2 run my_robot sensor_node --ros-args --params-file kamera_config.yaml
+ros2 run robotik_uno_q sensor_node \
+    --ros-args --params-file config/sensor_config.yaml
 \end{lstlisting}
-Konfiguration von Code zu trennen ist eines der Kernprinzipien
-professioneller Robotikentwicklung.
+Die Datei, die du gerade erstellt hast, ist in
+Band~2 bereits die richtige Grundlage.
 \end{robotikBox}
 
 % ── Kapitel 9 ────────────────────────────────────────────────
 \chapter{Wir wollen mehrere Befehle automatisch ausführen}
 
 \kapitelziel{
-Du kannst Shell-Skripte schreiben, die Abläufe automatisieren,
-und verstehst Variablen, Bedingungen und Schleifen in Bash.
+Du schreibst ein Shell-Skript, das den robotik-uno-q-Stack
+vollständig startet -- ein Befehl für alles.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du musst nach jedem Roboter-Start fünf Befehle manuell eintippen:
-ROS2 laden, Workspace sourcen, drei Nodes starten. Das kostet Zeit
-und führt zu Tippfehlern.
+
+Um \texttt{sensor\_bridge.py} zu starten, musst du jedes Mal:
+\begin{enumerate}
+  \item In das richtige Verzeichnis wechseln
+  \item ROS2 laden (falls installiert)
+  \item Pyserial prüfen
+  \item Das Skript starten
+\end{enumerate}
+
+Vier Befehle. Jeden Tag. Immer in derselben Reihenfolge.
+Das ist eine Aufgabe für ein Skript.
 
 \begin{aufgabeBox}
-Schreibe ein Shell-Skript, das den gesamten Startvorgang
-automatisiert.
+Schreibe \texttt{scripts/start\_roboter.sh}, das den gesamten
+Stack mit einem einzigen Befehl startet.
 \end{aufgabeBox}
 
 \begin{problemBox}
-Ein Shell-Skript ist keine normale Textdatei. Es braucht einen
-Shebang, Ausführungsrechte und eine korrekte Syntax.
+Shell-Skripte haben eine eigene Syntax. Leerzeichen um
+\texttt{=} sind verboten. Zeilenenden müssen Unix-Format
+haben (\texttt{\textbackslash n}, nicht \texttt{\textbackslash r\textbackslash n}).
 \end{problemBox}
 
-\section{Der pragmatische Weg}
+\begin{haubeBox}
+\textbf{Warum kann man Leerzeichen um = nicht verwenden?}
+
+In Bash ist \texttt{NAME=Wert} eine Variablenzuweisung.
+\texttt{NAME = Wert} hingegen ist ein Befehl: führe das
+Programm \texttt{NAME} mit den Argumenten \texttt{=}
+und \texttt{Wert} aus -- und schlägt fehl, weil kein
+Programm so heißt.
+
+Das verwirrt Anfänger regelmäßig.
+Die Regel: Bei Bash-Variablen niemals Leerzeichen um \texttt{=}.
+\end{haubeBox}
+
+\section{Das Startskript}
 
 \begin{lstlisting}[style=bash]
 #!/bin/bash
-# start_roboter.sh -- Roboter-Startskript
+# scripts/start_roboter.sh
+# Startet den robotik-uno-q Stack
 
-# Variablen
-WORKSPACE=~/robotik/ros2_ws
-ROS_DISTRO=jazzy
+set -e   # Skript stoppt bei erstem Fehler
 
-# Umgebung laden
-source /opt/ros/${ROS_DISTRO}/setup.bash
-source ${WORKSPACE}/install/setup.bash
+PROJEKT="$HOME/robotik-uno-q"
+LOG_DIR="$PROJEKT/stufe2_ros2/logs"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
-echo "ROS2 geladen: $ROS_DISTRO"
+echo "=== robotik-uno-q Start ==="
+echo "Zeitstempel: $TIMESTAMP"
 
-# Bedingung: Workspace vorhanden?
-if [ -d "$WORKSPACE" ]; then
-    echo "Workspace gefunden: $WORKSPACE"
-else
-    echo "FEHLER: Workspace nicht gefunden!"
+# Verzeichnis pruefen
+if [ ! -d "$PROJEKT" ]; then
+    echo "FEHLER: Projektordner nicht gefunden: $PROJEKT"
     exit 1
 fi
 
-# Nodes starten
-ros2 launch my_robot robot.launch.py &
-echo "Roboter gestartet."
+# Logverzeichnis anlegen
+mkdir -p "$LOG_DIR"
+
+# Pyserial pruefen
+if ! python3 -c "import serial" 2>/dev/null; then
+    echo "Installiere pyserial..."
+    pip3 install pyserial
+fi
+
+# Sensor-Bridge starten
+echo "Starte sensor_bridge.py..."
+cd "$PROJEKT/stufe2_ros2"
+python3 src/sensor_bridge.py >> "$LOG_DIR/sensor_$TIMESTAMP.log" 2>&1 &
+echo "Gestartet mit PID $!"
+
+echo "=== Stack bereit ==="
 \end{lstlisting}
 
 \begin{loesungBox}
 \begin{lstlisting}[style=bash]
-# Skript erstellen und ausfuehrbar machen
-nano start_roboter.sh
-chmod +x start_roboter.sh
-
-# Testen
-./start_roboter.sh
-
-# Debugging: Jeden Befehl ausgeben
-bash -x start_roboter.sh
+cd ~/robotik-uno-q
+nano scripts/start_roboter.sh   # Inhalt einfuegen
+chmod +x scripts/start_roboter.sh
+./scripts/start_roboter.sh
 \end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} YAML-Konfiguration erstellt.\\
+\textbf{Heute:} \texttt{scripts/start\_roboter.sh} -- ein Befehl
+startet den gesamten Stack und schreibt Logs.\\
+\textbf{Nächstes Kapitel:} Automatischer Start beim Hochfahren.
+\end{projektBox}
+
 \begin{merksatzBox}
-Jedes Bash-Skript beginnt mit \texttt{\#!/bin/bash}. Variablen werden
-mit \texttt{\$} abgerufen. Leerzeichen um \texttt{=} sind verboten:
-\texttt{VAR=wert} ist korrekt, \texttt{VAR = wert} ist ein Fehler.
+\texttt{set -e} oben im Skript ist Pflicht: Das Skript bricht
+bei jedem Fehler sofort ab, statt stumm weiterzumachen.
+\texttt{\$!} ist die PID des zuletzt gestarteten Hintergrundprozesses.
 \end{merksatzBox}
 
-\begin{fehlerBox}
-\begin{itemize}
-  \item \textbf{Leerzeichen um =:} \texttt{NAME = "ROS"} gibt Fehler. Richtig: \texttt{NAME="ROS"}
-  \item \textbf{Windows-Zeilenenden:} Skripte aus Windows haben \texttt{\textbackslash r\textbackslash n}. Fix: \texttt{dos2unix skript.sh}
-\end{itemize}
-\end{fehlerBox}
-
-\begin{uebungBox}
-Schreibe ein Skript, das:
-1. Prüft ob Python3 installiert ist (\texttt{which python3}).
-2. Bei Erfolg die Python-Version ausgibt.
-3. Bei Fehler eine Fehlermeldung zeigt und mit Exit-Code 1 beendet.
-\end{uebungBox}
-
-\begin{quizBox}
-\begin{enumerate}
-  \item Was ist ein Shebang?
-  \item Wie ruft man eine Bash-Variable ab?
-  \item Wie prüft man in Bash, ob eine Datei existiert?
-\end{enumerate}
-\textbf{Antworten:} 1. Die erste Zeile (\texttt{\#!/bin/bash}), die den Interpreter angibt.
-2. Mit vorangestelltem \$, z.\,B. \texttt{\$VARIABLE}. 3. Mit \texttt{if [ -f "\$DATEI" ]}.
-\end{quizBox}
-
-\begin{haubeBox}
-\textbf{Pipes und Umleitungen kombiniert:}
-\begin{lstlisting}[style=bash]
-ros2 topic list | grep sensor | wc -l
-\end{lstlisting}
-Dieser Einzeiler: listet alle Topics, filtert nach "sensor",
-zählt die Treffer. Pipes verbinden Programme zu einer Verarbeitungskette --
-das Unix-Philosophie-Prinzip: viele kleine Programme, die je eine Sache gut machen.
-\end{haubeBox}
-
 \begin{robotikBox}
-ROS2 Launch-Dateien in Python sind mächtiger als Shell-Skripte --
-aber Shell-Skripte bleiben nützlich für Umgebungs-Setup,
-Backup-Routinen und Deployment-Automatisierung auf dem Roboter.
+ROS2 Launch-Dateien sind Python-Skripte (\texttt{.launch.py}).
+Sie tun dasselbe wie \texttt{start\_roboter.sh} -- aber mit
+ROS2-Infrastruktur: automatische Node-Discovery, Parameter-Übergabe
+und geordnetes Herunterfahren.
+Das Shell-Skript ist die Vorstufe, die Launch-Datei die Weiterentwicklung.
 \end{robotikBox}
 
 % ── Kapitel 10 ────────────────────────────────────────────────
 \chapter{Wir wollen ein Programm regelmäßig starten}
 
 \kapitelziel{
-Du kannst Prozesse automatisch starten lassen -- beim Systemstart
-oder nach einem Zeitplan.
+Du richtest den automatischen Start des robotik-uno-q-Stacks
+beim Hochfahren des Raspberry Pi ein.
 }
 \kapitelstruktur
 
 \section{Situation}
-Der Roboter soll nach dem Einschalten automatisch seinen Sensor-Node
-starten, ohne dass jemand manuell einloggt.
+
+Beim Schulprojekt-Vortrag soll der Roboter einfach eingesteckt
+werden und automatisch loslaufen. Kein Terminal aufmachen,
+kein SSH, kein manueller Start. Das ist der Unterschied
+zwischen einem Labormuster und einem funktionierenden System.
 
 \begin{aufgabeBox}
-Richte den automatischen Start eines Programms beim Hochfahren ein.
+Richte einen systemd-Dienst ein, der \texttt{start\_roboter.sh}
+automatisch nach dem Hochfahren ausführt.
 \end{aufgabeBox}
 
-\begin{problemBox}
-Cron und systemd sind zwei verschiedene Systeme mit unterschiedlicher
-Syntax. Der falsche Ansatz führt zu schwer debuggbaren Problemen.
-\end{problemBox}
+\begin{haubeBox}
+\textbf{Warum systemd statt Cron?}
 
-\section{Cron -- Zeitgesteuerte Aufgaben}
+Cron ist für zeitgesteuerte, regelmäßige Aufgaben.
+systemd verwaltet Dienste: es startet sie in der richtigen
+Reihenfolge (erst Netzwerk, dann ROS2), überwacht sie
+(und startet sie bei Absturz neu) und protokolliert alles.
 
-\begin{lstlisting}[style=bash]
-# Crontab bearbeiten
-crontab -e
+\texttt{@reboot} in cron würde funktionieren -- aber wenn
+\texttt{start\_roboter.sh} abstürzt, ist das still.
+Systemd erkennt den Absturz und kann neu starten.
+Für einen autonomen Roboter ist das unverzichtbar.
+\end{haubeBox}
 
-# Syntax: Minute Stunde Tag Monat Wochentag Befehl
-# Jeden Tag um 3:30 Uhr:
-30 3 * * * /home/ros/backup.sh >> /home/ros/backup.log 2>&1
-
-# Jede Stunde:
-0 * * * * python3 /home/ros/sensor_check.py
-
-# Bei Systemstart (@reboot):
-@reboot sleep 10 && /home/ros/start_roboter.sh
-\end{lstlisting}
-
-\section{systemd -- Dienste beim Systemstart}
+\section{Systemd-Dienst}
 
 \begin{lstlisting}[style=text]
-# /etc/systemd/system/roboter.service
+# /etc/systemd/system/robotik-uno-q.service
 [Unit]
-Description=Roboter Sensor Node
+Description=robotik-uno-q Sensor Stack
 After=network.target
+Wants=network.target
 
 [Service]
+Type=simple
 User=ros
-WorkingDirectory=/home/ros/robotik
-ExecStart=/home/ros/start_roboter.sh
+WorkingDirectory=/home/ros/robotik-uno-q
+ExecStart=/home/ros/robotik-uno-q/scripts/start_roboter.sh
 Restart=on-failure
-RestartSec=5
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 \end{lstlisting}
 
 \begin{lstlisting}[style=bash]
-# Dienst aktivieren
-sudo systemctl enable roboter.service
-sudo systemctl start roboter.service
-sudo systemctl status roboter.service
-journalctl -u roboter.service -f   # Logs live
+# Dienst einrichten
+sudo cp robotik-uno-q.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable robotik-uno-q.service
+sudo systemctl start robotik-uno-q.service
+
+# Status pruefen
+sudo systemctl status robotik-uno-q.service
+journalctl -u robotik-uno-q.service -f   # Live-Logs
 \end{lstlisting}
 
-\begin{loesungBox}
-Für den Roboter-Autostart: systemd ist die bessere Wahl.
-Es verwaltet Abhängigkeiten (z.\,B. erst nach Netzwerk starten),
-überwacht den Prozess und startet ihn bei Absturz neu.
-\end{loesungBox}
+\begin{projektBox}
+\textbf{Bisher:} Manueller Start per Skript.\\
+\textbf{Heute:} Automatischer Start per systemd -- der Roboter
+startet nach dem Einschalten selbstständig.\\
+\textbf{Nächstes Kapitel:} Entwicklungsumgebung mit VS Code.
+\end{projektBox}
 
 \begin{merksatzBox}
-Cron für geplante, regelmäßige Aufgaben. Systemd für permanente
-Dienste, die beim Start laufen sollen und stabil bleiben müssen.
-Der Roboter-Node gehört zu systemd.
+\texttt{Restart=on-failure} ist der Watchdog des armen Mannes.
+Wenn der Sensor-Stack abstürzt, startet systemd ihn nach
+10 Sekunden neu -- ohne menschliches Eingreifen.
+Das ist der Unterschied zwischen einem Prototyp und
+einem produktiven System.
 \end{merksatzBox}
 
-\begin{quizBox}
-\begin{enumerate}
-  \item Was macht \texttt{@reboot} in einem Crontab-Eintrag?
-  \item Wie zeigt man den Status eines systemd-Dienstes?
-  \item Was bedeutet \texttt{Restart=on-failure}?
-\end{enumerate}
-\textbf{Antworten:} 1. Der Befehl wird nach jedem Systemstart ausgeführt.
-2. Mit \texttt{systemctl status name.service}.
-3. Der Dienst wird bei einem Absturz automatisch neu gestartet.
-\end{quizBox}
-
 \begin{robotikBox}
-Auf einem mobilen Roboter ist systemd unverzichtbar: Der ROS2-Stack
-soll nach dem Einschalten selbstständig starten, überwacht werden
-und bei Absturz neu starten -- ohne Eingriff. Das ist der Übergang
-von \enquote{Laboraufbau} zu \enquote{autonomem System}.
+In professionellen Robotik-Systemen läuft der komplette ROS2-Stack
+als systemd-Dienst. Das \texttt{docker-compose up} aus Teil~6
+wird dort ebenfalls als systemd-Einheit gestartet -- dann
+startet beim Einschalten automatisch Docker, dann der
+ROS2-Container, dann alle Nodes.
 \end{robotikBox}
