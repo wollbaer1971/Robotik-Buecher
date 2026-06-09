@@ -5,25 +5,29 @@
 \chapter{Wir wollen ein Programm auf jedem Computer gleich ausführen}
 
 \kapitelziel{
-Du verstehst das Container-Konzept, kannst Docker-Images nutzen
-und erste Container starten.
+Du verstehst das Container-Konzept und startest einen
+ROS2-Container, in dem \texttt{stufe2\_ros2/} läuft --
+identisch auf Laptop, Raspberry Pi und Schulrechner.
 }
 \kapitelstruktur
 
 \section{Situation}
-ROS2 läuft auf deinem Laptop. Auf dem Raspberry Pi des Roboters
-fehlen Abhängigkeiten. Auf dem Schulrechner ist die falsche
-Ubuntu-Version. Überall sieht es anders aus.
+
+\texttt{sensor\_bridge.py} läuft auf deinem Laptop.
+Auf dem Raspberry Pi des Roboters fehlt \texttt{pyserial}.
+Auf dem Schulrechner ist Ubuntu 20.04, aber du entwickelst mit 24.04.
+Jedes Mal andere Umgebung, jedes Mal andere Fehler.
 
 \begin{aufgabeBox}
-Lerne Docker kennen und starte einen ROS2-Container, der auf
-jedem Linux-System gleich funktioniert.
+Starte \texttt{sensor\_bridge.py} in einem Docker-Container,
+der auf jedem Linux-System identisch funktioniert.
 \end{aufgabeBox}
 
 \begin{problemBox}
-Software hat Abhängigkeiten. Diese Abhängigkeiten haben
-Abhängigkeiten. Das nennt sich \textit{Dependency Hell} --
-und Docker ist die Lösung.
+Software hat Abhängigkeiten. Diese haben Abhängigkeiten.
+Auf dem eigenen Rechner funktioniert alles -- woanders nicht.
+Das nennt sich \textit{Dependency Hell}.
+Docker ist die Lösung.
 \end{problemBox}
 
 \begin{wissenBox}
@@ -31,374 +35,333 @@ Wir brauchen: den Unterschied zwischen Image und Container,
 grundlegende Docker-Befehle und das Prinzip der Isolation.
 \end{wissenBox}
 
+\begin{haubeBox}
+\textbf{Warum ist Docker kein Betrug an der Portierbarkeit?}
+
+Früher gab es VMs: Ein vollständiger zweiter Betriebssystem-Kernel
+lief innerhalb des Hosts. Teuer, langsam, gigantisch.
+
+Docker nutzt Linux-Kernel-Funktionen -- \textit{namespaces}
+für Isolation und \textit{cgroups} für Ressourcenbegrenzung.
+Der Container läuft im selben Kernel wie der Host.
+Das Ergebnis: Ein ROS2-Container startet in Sekunden statt Minuten.
+Und er ist auf jedem Linux identisch -- weil Linux gleich ist.
+\end{haubeBox}
+
 \begin{analogie}
-Ein Docker-Image ist wie eine ISO-Datei einer Linux-Installation.
-Ein Container ist das laufende System, das aus diesem Image
-gestartet wurde. Aus einem Image können viele Container entstehen --
-wie viele VMs aus einem Snapshot.
+Ein Docker-Image ist wie die ISO-Datei einer Linux-Installation.
+Ein Container ist das laufende System aus diesem Image --
+wie eine gestartete VM, aber ohne eigenen Kernel.
+Aus einem Image können viele Container entstehen.
 \end{analogie}
 
+\section{Der pragmatische Weg}
+
 \begin{lstlisting}[style=bash]
-# Docker installieren (Ubuntu)
+# Docker einrichten (einmalig)
 sudo apt install docker.io
-sudo usermod -aG docker $USER   # Neueinloggen danach noetig
+sudo usermod -aG docker $USER
+newgrp docker
 
-# Images verwalten
-docker images                   # Lokale Images anzeigen
-docker pull ubuntu:22.04        # Image herunterladen
-docker pull ros:jazzy           # ROS2-Image
-
-# Container starten
-docker run ubuntu:22.04 echo "Hallo aus dem Container"
-
-# Interaktiv starten
-docker run -it ubuntu:22.04 bash
-# Jetzt sind wir INSIDE des Containers!
-exit   # Container beenden
-\end{lstlisting}
-
-\begin{loesungBox}
-\textbf{ROS2-Container starten:}
-\begin{lstlisting}[style=bash]
 # ROS2-Image laden
 docker pull ros:jazzy
 
-# Container interaktiv starten
+# Erster Test: ROS2 im Container starten
 docker run -it ros:jazzy bash
-
-# Innerhalb des Containers:
+# Jetzt sind wir INSIDE des Containers:
 source /opt/ros/jazzy/setup.bash
 ros2 --version
-ros2 topic list
 exit
 \end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[style=bash]
+# Container mit Projektordner starten
+docker run -it \
+  -v ~/robotik-uno-q:/robotik-uno-q \
+  ros:jazzy bash
+
+# Im Container:
+cd /robotik-uno-q/stufe2_ros2
+pip3 install pyserial pyyaml
+python3 src/sensor_bridge.py
+\end{lstlisting}
+Pyserial ist jetzt im Container -- nicht am Host.
+Das Projektverzeichnis ist per Volume eingebunden:
+Änderungen am Host sind sofort im Container sichtbar.
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} \texttt{sensor\_bridge.py} läuft nur lokal.\\
+\textbf{Heute:} ROS2-Container gestartet, Projekt eingebunden.
+Läuft auf jedem Linux.\\
+\textbf{Nächstes Kapitel:} Im Container debuggen.
+\end{projektBox}
+
 \begin{merksatzBox}
-Image = Bauplan (unveränderlich). Container = laufende Instanz.
-Container sind kurzlebig -- wenn sie gestoppt werden, sind
-Änderungen weg. Persistenz kommt über Volumes (Kapitel 18).
+Image = Bauplan (unveränderlich).
+Container = laufende Instanz.
+\texttt{-v host:container} bindet Ordner ein.
+Container sind kurzlebig -- Daten überleben nur via Volumes.
 \end{merksatzBox}
 
-\begin{quizBox}
-\begin{enumerate}
-  \item Was ist der Unterschied zwischen Image und Container?
-  \item Was passiert mit Dateien im Container nach \texttt{exit}?
-  \item Wie startet man einen Container interaktiv?
-\end{enumerate}
-\textbf{Antworten:} 1. Image ist der Bauplan; Container ist die laufende Instanz.
-2. Standardmäßig gehen sie verloren. 3. Mit \texttt{docker run -it image bash}.
-\end{quizBox}
-
-\begin{haubeBox}
-Docker nutzt Linux-Kernel-Funktionen: \textit{namespaces} für Isolation
-(eigenes Dateisystem, Netzwerk, Prozessraum) und \textit{cgroups} für
-Ressourcenbegrenzung. Im Gegensatz zu VMs läuft kein zweiter Kernel --
-Container sind deshalb deutlich leichtgewichtiger.
-\end{haubeBox}
-
 \begin{robotikBox}
-Das offizielle ROS2-Image \texttt{ros:jazzy} enthält eine vollständige
-ROS2-Installation. So kann jeder -- egal welches Ubuntu -- sofort
-mit ROS2 arbeiten. Das ist der Standard in der Robotik-Industrie.
+Das offizielle \texttt{ros:jazzy}-Image enthält eine vollständige
+ROS2-Installation. In der Robotik-Industrie ist Docker Standard:
+Jeder Entwickler klont das Repo und startet einen Container --
+keine Installationsanleitung, keine Abhängigkeitsprobleme.
 \end{robotikBox}
 
 % ── Kapitel 17 ────────────────────────────────────────────────
-\chapter{Wir wollen einen Linux-Container betreten}
+\chapter{Wir wollen einen laufenden Container betreten}
 
 \kapitelziel{
-Du kannst in laufende Container einsteigen und deren Zustand
-untersuchen -- ein essenzielles Debugging-Werkzeug.
+Du kannst in laufende Container einsteigen und
+\texttt{sensor\_bridge.py} von innen debuggen.
 }
 \kapitelstruktur
 
 \section{Situation}
-Ein ROS2-Node läuft in einem Container, verhält sich aber falsch.
-Du musst den Container von innen untersuchen.
+
+\texttt{sensor\_bridge.py} läuft im Container, aber liefert
+falsche Werte. Du musst von innen nachschauen:
+Welche Umgebungsvariablen sind gesetzt? Welche Python-Pakete
+sind installiert? Sieht der Container den Serial-Port?
 
 \begin{aufgabeBox}
-Betrete einen laufenden Container und debugge das Problem von innen.
+Starte den Container im Hintergrund und betrete ihn
+mit einer zweiten Shell, um das Problem zu untersuchen.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=bash]
-# Laufende Container anzeigen
-docker ps
-docker ps -a   # Auch gestoppte Container
-
 # Container im Hintergrund starten
-docker run -d --name mein_ros ros:jazzy sleep infinity
+docker run -d --name robotik-dev \
+  -v ~/robotik-uno-q:/robotik-uno-q \
+  ros:jazzy sleep infinity
 
 # In laufenden Container einsteigen
-docker exec -it mein_ros bash
+docker exec -it robotik-dev bash
 
 # Innerhalb des Containers:
-ps aux         # Prozesse im Container
-env | grep ROS # Umgebungsvariablen
-ls /opt/ros/   # ROS2-Installation pruefen
+pip3 list | grep serial   # Pyserial installiert?
+ls /dev/ttyUSB*           # Serial-Port sichtbar?
+env | grep ROS            # ROS2-Umgebung geladen?
+python3 -c "import serial; print(serial.__version__)"
 exit
 
-# Container Logs anzeigen
-docker logs mein_ros
-docker logs -f mein_ros   # Live-Logs
+# Logs des Containers anzeigen
+docker logs robotik-dev
+docker logs -f robotik-dev   # Live
 
-# Container stoppen und loeschen
-docker stop mein_ros
-docker rm mein_ros
+# Aufraeumen
+docker stop robotik-dev
+docker rm robotik-dev
 \end{lstlisting}
 
-\begin{loesungBox}
-\textbf{Debugging-Workflow:}
-\begin{lstlisting}[style=bash]
-# 1. Container-Status pruefen
-docker ps
-docker stats mein_ros   # CPU/RAM live
-
-# 2. Logs lesen
-docker logs mein_ros 2>&1 | tail -50
-
-# 3. Einsteigen und untersuchen
-docker exec -it mein_ros bash
-source /opt/ros/jazzy/setup.bash
-ros2 topic list
-ros2 node list
-\end{lstlisting}
-\end{loesungBox}
+\begin{projektBox}
+\textbf{Heute:} Laufenden Container betreten, Konfiguration
+von innen geprüft.\\
+\textbf{Wichtige Erkenntnis:} \texttt{/dev/ttyUSB0} ist im Container
+nicht sichtbar -- das beheben wir in Kapitel~23.
+\end{projektBox}
 
 \begin{merksatzBox}
-\texttt{docker exec -it NAME bash} ist das Wichtigste nach
-\texttt{docker run}. Es öffnet eine Shell in einem laufenden
-Container -- wie SSH, aber für Container.
+\texttt{docker exec -it NAME bash} öffnet eine Shell
+in einem laufenden Container -- wie SSH, aber für Container.
+Es ist das wichtigste Debugging-Werkzeug nach \texttt{docker run}.
 \end{merksatzBox}
-
-\begin{robotikBox}
-Beim Debuggen auf dem Roboter: Container am Laufen lassen,
-per SSH auf den Raspberry Pi, dann \texttt{docker exec -it ros\_node bash}
--- und von innen heraus debuggen, ohne den Node neu starten zu müssen.
-\end{robotikBox}
 
 % ── Kapitel 18 ────────────────────────────────────────────────
 \chapter{Wir wollen Daten behalten, obwohl der Container gelöscht wird}
 
 \kapitelziel{
-Du kannst Docker Volumes und Bind Mounts verwenden, um Daten
-zwischen Container und Host auszutauschen.
+Du richtest Volumes ein, damit Sensor-Logs aus dem Container
+dauerhaft in \texttt{stufe2\_ros2/logs/} gespeichert werden.
 }
 \kapitelstruktur
 
 \section{Situation}
-Der ROS2-Node zeichnet Sensordaten in eine Datei im Container.
-Nach \texttt{docker stop} sind die Daten weg.
+
+\texttt{sensor\_bridge.py} schreibt Logs.
+Der Container wird nach dem Testen gelöscht.
+Die Logs sind weg.
 
 \begin{aufgabeBox}
-Rette Sensordaten aus dem Container ins Host-Dateisystem.
+Binde \texttt{stufe2\_ros2/logs/} als Volume ein, sodass
+Sensor-Logs den Container-Neustart überleben.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=bash]
-# Bind Mount: Host-Ordner im Container einhaengen
+# Bind Mount: Host-Ordner im Container verfuegbar machen
 docker run -it \
-  -v /home/ros/daten:/daten \
+  -v ~/robotik-uno-q:/robotik-uno-q \
+  -v ~/robotik-uno-q/stufe2_ros2/logs:/root/.ros/log \
   ros:jazzy bash
 
-# Innerhalb des Containers:
-echo "Sensorwert: 0.42" > /daten/sensor.log
+# Im Container: Logs schreiben
+cd /robotik-uno-q/stufe2_ros2
+python3 src/sensor_bridge.py 2>&1 | tee /root/.ros/log/session.log
+
 exit
 
-# Auf dem Host:
-cat /home/ros/daten/sensor.log   # Datei ist noch da!
-
-# Named Volume: von Docker verwalteter Speicher
-docker volume create ros_logs
-docker run -it \
-  -v ros_logs:/root/.ros/log \
-  ros:jazzy bash
+# Auf dem Host: Log ist noch da!
+cat ~/robotik-uno-q/stufe2_ros2/logs/session.log
 \end{lstlisting}
 
-\begin{loesungBox}
-\textbf{Für den Roboter:} Immer Bind Mount für Konfiguration und Logs:
-\begin{lstlisting}[style=bash]
-docker run -it \
-  -v ~/robotik/config:/config:ro \
-  -v ~/robotik/logs:/root/.ros/log \
-  ros:jazzy bash
-\end{lstlisting}
-\texttt{:ro} = read-only -- der Container kann lesen, aber nicht schreiben.
-\end{loesungBox}
-
-\begin{merksatzBox}
-Bind Mount (\texttt{-v /host/pfad:/container/pfad}): direkter Zugriff
-auf Host-Dateien -- ideal für Konfiguration und Logs.
-Named Volume (\texttt{-v name:/pfad}): von Docker verwaltet -- ideal
-für Datenbankdateien und persistente Zustände.
-\end{merksatzBox}
+\begin{projektBox}
+\textbf{Heute:} \texttt{stufe2\_ros2/logs/} als Bind Mount --
+Logs überleben Container-Neustarts.
+\end{projektBox}
 
 \begin{robotikBox}
-ROS2 Rosbag-Aufnahmen werden als Named Volume gespeichert --
-so gehen Messdaten nie verloren, auch wenn der Container neugestartet
-oder geupdated wird. Das Bag bleibt, der Container kann weg.
+ROS2-Rosbag-Aufnahmen (\texttt{.db3}) werden als Bind Mount
+gespeichert. So gehen Messdaten nie verloren, auch wenn der
+Container für ein Update neu gebaut wird.
+Das Bag bleibt, der Container kann weg.
 \end{robotikBox}
 
 % ── Kapitel 19 ────────────────────────────────────────────────
 \chapter{Wir wollen unser eigenes Docker-Image bauen}
 
 \kapitelziel{
-Du kannst ein Dockerfile schreiben und daraus ein eigenes
-Image mit deiner Robotik-Software bauen.
+Du erstellst ein Dockerfile für \texttt{stufe2\_ros2/}
+mit allen Python-Abhängigkeiten von robotik-uno-q.
 }
 \kapitelstruktur
 
 \section{Situation}
-Das offizielle ROS2-Image fehlt eine Bibliothek, die du brauchst.
-Außerdem soll dein Code automatisch mit gestartet werden.
+
+Jedes Mal \texttt{pip3 install pyserial pyyaml} im Container
+tippen ist nervig. Das Dockerfile automatisiert das -- und
+macht den Container reproduzierbar.
 
 \begin{aufgabeBox}
-Erstelle ein eigenes Docker-Image auf Basis von ROS2-jazzy
-mit deinen Abhängigkeiten.
+Erstelle \texttt{stufe2\_ros2/Dockerfile} mit allen
+Abhängigkeiten für \texttt{sensor\_bridge.py}.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=dockerfile]
-# Dockerfile
+# stufe2_ros2/Dockerfile
 FROM ros:jazzy
 
-# Metadaten
 LABEL maintainer="Wolfgang Becker"
-LABEL description="MobileRobot-1 Sensor Stack"
+LABEL description="robotik-uno-q Stufe 2 -- Sensor-Bridge"
 
-# System-Pakete installieren
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    ros-jazzy-sensor-msgs \
-    && rm -rf /var/lib/apt/lists/*
+# Python-Abhaengigkeiten installieren
+RUN pip3 install pyserial pyyaml
 
-# Python-Pakete installieren
-RUN pip3 install numpy pyserial
+# Arbeitsverzeichnis
+WORKDIR /robotik-uno-q/stufe2_ros2
 
-# Eigenen Code hinzufuegen
-WORKDIR /robotik
-COPY src/ ./src/
-COPY config/ ./config/
-
-# Startbefehl
-CMD ["bash", "-c", \
-     "source /opt/ros/jazzy/setup.bash && python3 src/sensoren.py"]
+# Startbefehl (ueberschreibbar per docker run)
+CMD ["python3", "src/sensor_bridge.py"]
 \end{lstlisting}
 
 \begin{lstlisting}[style=bash]
+cd ~/robotik-uno-q/stufe2_ros2
+
 # Image bauen
-docker build -t mobilerobort1:v1.0 .
+docker build -t robotik-uno-q:v0.1 .
 
 # Testen
-docker run -it mobilerobort1:v1.0
-
-# Auf Docker Hub hochladen (optional)
-docker tag mobilerobort1:v1.0 wollbaer1971/mobilerobort1:v1.0
-docker push wollbaer1971/mobilerobort1:v1.0
+docker run -it \
+  -v ~/robotik-uno-q:/robotik-uno-q \
+  robotik-uno-q:v0.1 bash
 \end{lstlisting}
 
-\begin{merksatzBox}
-Jede \texttt{RUN}-Zeile erzeugt einen Layer. Wenige, kombinierte
-\texttt{RUN}-Befehle = kleineres Image. \texttt{apt-get} immer mit
-\texttt{\&\& rm -rf /var/lib/apt/lists/*} abschließen, um den
-Package-Cache nicht im Image zu behalten.
-\end{merksatzBox}
+\begin{projektBox}
+\textbf{Heute:} \texttt{stufe2\_ros2/Dockerfile} erstellt.
+Jeder, der das Repo klont, kann mit einem Befehl die
+identische Umgebung aufbauen.
+\end{projektBox}
 
-\begin{robotikBox}
-Professionelle Robotikprojekte haben ein \texttt{Dockerfile} im Repository.
-Jeder, der den Code klont, kann mit \texttt{docker build . -t roboter}
-sofort eine identische Entwicklungsumgebung erstellen -- unabhängig
-vom Betriebssystem des Entwicklers.
-\end{robotikBox}
+\begin{merksatzBox}
+Jede \texttt{RUN}-Zeile erzeugt einen Layer.
+Wenige kombinierte Befehle = kleineres Image.
+\texttt{FROM ros:jazzy} gibt es gratis -- keine manuelle
+ROS2-Installation nötig.
+\end{merksatzBox}
 
 % ── Kapitel 20 ────────────────────────────────────────────────
 \chapter{Wir wollen mehrere Container gemeinsam starten}
 
 \kapitelziel{
-Du kannst einen mehrteiligen ROS2-Stack mit docker-compose
-definieren und mit einem einzigen Befehl starten.
+Du definierst den vollständigen stufe2\_ros2-Stack
+in \texttt{docker-compose.yml} und startest alles
+mit einem einzigen Befehl.
 }
 \kapitelstruktur
 
 \section{Situation}
-Dein Roboter hat drei Nodes: Sensor, Navigation, Motor-Steuerung.
-Drei separate \texttt{docker run}-Befehle sind fehleranfällig.
+
+Bald hat \texttt{stufe2\_ros2/} mehrere Komponenten:
+die Serial-Bridge zum Arduino, die Navigation und
+ein einfaches Dashboard. Drei separate
+\texttt{docker run}-Befehle -- das ist fehleranfällig.
 
 \begin{aufgabeBox}
-Definiere alle Container in einer \texttt{docker-compose.yml}
-und starte sie gemeinsam.
+Definiere den Stack in \texttt{docker-compose.yml}
+und starte alle Dienste mit \texttt{docker-compose up}.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=yaml]
-# docker-compose.yml
+# robotik-uno-q/docker-compose.yml
 version: '3.8'
 
 services:
-  sensor_node:
-    image: mobilerobort1:v1.0
-    command: python3 src/sensoren.py
+  sensor_bridge:
+    build: ./stufe2_ros2
     volumes:
-      - ./logs:/root/.ros/log
-      - ./config:/config:ro
+      - ./stufe2_ros2:/robotik-uno-q/stufe2_ros2
+      - ./stufe2_ros2/logs:/root/.ros/log
+    devices:
+      - "/dev/arduino:/dev/arduino"   # Arduino-Port (nach Kapitel 23)
     restart: unless-stopped
     networks:
-      - ros_network
+      - ros_net
 
-  navigation_node:
-    image: mobilerobort1:v1.0
-    command: python3 src/navigation.py
-    depends_on:
-      - sensor_node
-    networks:
-      - ros_network
-
-  motor_node:
-    image: mobilerobort1:v1.0
-    command: python3 src/motoren.py
-    devices:
-      - "/dev/ttyUSB0:/dev/ttyUSB0"
-    networks:
-      - ros_network
+  # Platzhalter fuer Band 2:
+  # navigation_node:
+  #   ...
 
 networks:
-  ros_network:
+  ros_net:
     driver: bridge
 \end{lstlisting}
 
 \begin{lstlisting}[style=bash]
-# Alle Container starten
-docker-compose up
+cd ~/robotik-uno-q
 
-# Im Hintergrund starten
+# Stack starten
 docker-compose up -d
 
 # Logs verfolgen
-docker-compose logs -f
+docker-compose logs -f sensor_bridge
 
 # Stoppen
 docker-compose down
-
-# Einzelnen Service neu starten
-docker-compose restart sensor_node
 \end{lstlisting}
+
+\begin{projektBox}
+\textbf{Heute:} \texttt{docker-compose.yml} im Projektstamm --
+der gesamte stufe2-Stack mit einem Befehl.\\
+\textbf{Zusammen mit systemd aus Kapitel~10:} Nach dem Einschalten
+startet systemd Docker, Docker startet den Stack.
+Komplett automatisch.
+\end{projektBox}
 
 \begin{merksatzBox}
-\texttt{docker-compose up -d} startet alles. \texttt{docker-compose down}
-stoppt alles. Eine \texttt{docker-compose.yml} ist die Dokumentation
-des gesamten Systems -- man sieht auf einen Blick, welche Services
-es gibt, wie sie verbunden sind und welche Ressourcen sie brauchen.
+\texttt{docker-compose up -d} startet alles.
+\texttt{docker-compose down} stoppt alles.
+\texttt{devices:} gibt dem Container Zugriff auf
+Hardware-Geräte -- ohne das sieht der Container
+den Arduino nicht.
 \end{merksatzBox}
 
-\begin{fehlerBox}
-\begin{itemize}
-  \item \textbf{depends\_on} stellt nur sicher, dass der Container \textit{gestartet} wurde -- nicht dass die Anwendung darin bereit ist. Für echte Readiness: Health Checks.
-  \item \textbf{USB-Gerät nicht verfügbar:} Ohne \texttt{devices} kann der Container den Port nicht sehen.
-\end{itemize}
-\end{fehlerBox}
-
 \begin{robotikBox}
-Mit docker-compose lässt sich der gesamte ROS2-Stack auf dem
-Roboter als Service definieren. Gemeinsam mit systemd:
-\begin{lstlisting}[style=bash]
-# /etc/systemd/system/roboter.service
-ExecStart=/usr/bin/docker-compose -f /home/ros/robotik/docker-compose.yml up
-\end{lstlisting}
--- und der Roboter startet nach dem Einschalten vollautomatisch.
+In professionellen Robotikprojekten definiert die
+\texttt{docker-compose.yml} den kompletten Produktivstack:
+Sensor-Nodes, Navigation, Logging, Monitoring.
+Die Datei im Repo ist gleichzeitig Dokumentation
+und Deploymentanleitung.
 \end{robotikBox}
