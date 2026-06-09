@@ -1,0 +1,125 @@
+% ============================================================
+\chapter{Modul 4: Funktionen}
+% ============================================================
+
+Ein Roboterprogramm ohne Funktionen ist wie eine Fabrik ohne Maschinen -- alles wird mühsam von Hand erledigt. Funktionen sind wiederverwendbare, benannte Einheiten -- das Fundament strukturierten Codes.
+
+\section{Lektion 11: Eigene Funktionen definieren}
+
+\begin{lstlisting}
+def roboter_start():
+    print("Systeme pruefen...")
+    print("Sensoren initialisiert.")
+    print("Motoren bereit.")
+    print("Roboter betriebsbereit.")
+
+# Aufruf -- so oft wie nötig:
+roboter_start()
+\end{lstlisting}
+
+\begin{merksatz}
+\texttt{def FUNKTIONSNAME():} definiert die Funktion. Der eingerückte Block darunter ist der Funktionskoerper. Die Funktion läuft \textbf{erst beim Aufruf} -- nicht beim Definieren.
+\end{merksatz}
+
+\section{Lektion 12: Parameter}
+
+Parameter machen Funktionen flexibel. Statt einer Funktion pro Geschwindigkeit schreibt man eine Funktion mit Geschwindigkeit als Parameter.
+
+\begin{lstlisting}
+def fahre(richtung, geschwindigkeit=0.3, dauer=5):
+    weg = geschwindigkeit * dauer
+    print(f"Fahre {richtung} mit {geschwindigkeit} m/s fuer {dauer} s")
+    print(f"Zurueckgelegter Weg: {weg:.2f} m")
+
+fahre("vorwaerts")               # Standardwerte
+fahre("links", 0.15, 3)          # alle Werte
+fahre("rueckwaerts", dauer=2)    # gemischt
+
+def drehe(winkel, winkel_geschw=30.0):
+    dauer = abs(winkel) / winkel_geschw
+    richtung = "links" if winkel > 0 else "rechts"
+    print(f"Drehe {abs(winkel)} Grad {richtung} ({dauer:.1f} s)")
+
+drehe(90)
+drehe(-45, 45.0)
+\end{lstlisting}
+
+\begin{merksatz}
+Default-Parameter (mit \texttt{=}) müssen immer \textbf{nach} den Pflichtparametern stehen. \texttt{def fahre(geschwindigkeit=0.3, richtung)} ist ein Fehler. \texttt{def fahre(richtung, geschwindigkeit=0.3)} ist korrekt.
+\end{merksatz}
+
+\section{Lektion 13: Rückgabewerte}
+
+\begin{lstlisting}
+def berechne_weg(v, t):
+    return v * t
+
+def kinematik(v_links, v_rechts, radabstand, dt):
+    v = (v_links + v_rechts) / 2
+    omega = (v_rechts - v_links) / radabstand
+    return v, omega   # zwei Rueckgabewerte als Tupel
+
+# Verwendung:
+weg = berechne_weg(0.3, 5.0)
+print(f"Weg: {weg} m")
+
+v, omega = kinematik(0.3, 0.35, 0.15, 0.1)
+print(f"Lineare Geschwindigkeit: {v:.3f} m/s")
+print(f"Winkelgeschwindigkeit:   {omega:.3f} rad/s")
+\end{lstlisting}
+
+\begin{praxis}
+Die \texttt{kinematik()}-Funktion ist der Kern jeder Differentialantrieb-Steuerung. Mit den Radgeschwindigkeiten links und rechts sowie dem Radabstand berechnet sie die Bewegung des Roboters. Diese Formel wirst du in ROS2 wiedersehen.
+\end{praxis}
+
+\section{Lektion 14: Programme strukturieren}
+
+\begin{lstlisting}
+# Vollstaendiges, strukturiertes Roboterprogramm
+
+def initialisierung():
+    print("System initialisiert.")
+    return True
+
+def lese_sensor(sensor_id):
+    # Simulierter Sensorwert
+    import random
+    return round(random.uniform(0.1, 2.0), 2)
+
+def entscheide(abstand):
+    if abstand < 0.20:
+        return "stopp"
+    elif abstand < 0.50:
+        return "langsam"
+    else:
+        return "normal"
+
+def fuehre_aus(befehl):
+    geschwindigkeiten = {"stopp": 0.0, "langsam": 0.1, "normal": 0.3}
+    v = geschwindigkeiten.get(befehl, 0.0)
+    print(f"Befehl: {befehl:8} | Geschwindigkeit: {v} m/s")
+
+def hauptschleife(iterationen=10):
+    for i in range(iterationen):
+        abstand = lese_sensor("ultraschall")
+        befehl  = entscheide(abstand)
+        fuehre_aus(befehl)
+
+# Hauptprogramm
+if initialisierung():
+    hauptschleife(10)
+\end{lstlisting}
+
+\begin{merksatz}
+\textbf{Eine Funktion, eine Aufgabe.} \texttt{lese\_sensor()} liest, \texttt{entscheide()} entscheidet, \texttt{fuehre\_aus()} handelt. Diese Trennung nennt man \textit{Separation of Concerns} -- sie macht Code testbar, wartbar und erweiterbar.
+\end{merksatz}
+
+\begin{ros}
+In ROS2-Nodes sieht die Struktur genau so aus: \texttt{\_\_init\_\_()} initialisiert, \texttt{timer\_callback()} ist die Hauptschleife, \texttt{sensor\_callback()} verarbeitet Eingaben. Jede Funktion hat genau eine Aufgabe.
+\end{ros}
+
+\begin{uebung}[title=Projektaufgabe Modul 4: Roboter-Bibliothek]
+Schreibe ein strukturiertes Programm mit mindestens 6 Funktionen:
+\texttt{starte()}, \texttt{stoppe()}, \texttt{fahre\_vorwaerts(v, t)}, \texttt{drehe(winkel)}, \texttt{lese\_abstand()}, \texttt{fahre\_route(punkte)}.
+\texttt{fahre\_route()} nimmt eine Liste von (Strecke, Winkel)-Tupeln und ruft die anderen Funktionen auf.
+\end{uebung}
