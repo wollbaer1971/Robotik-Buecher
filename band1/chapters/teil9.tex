@@ -2,265 +2,313 @@
 \part{Vorbereitung auf ROS2}
 % ============================================================
 
-\chapter{Wir wollen verstehen, warum ROS2 überhaupt existiert}
+\chapter{Wir wollen verstehen, warum robotik-uno-q ROS2 braucht}
 
 \kapitelziel{
-Du verstehst die Motivation hinter ROS2 und kannst erklären,
-welche Probleme es löst -- und welche es nicht löst.
+Du kannst erklären, an welche Grenzen das selbstgebaute System
+stößt und warum ROS2 die natürliche nächste Stufe ist.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du hast jetzt einen funktionierenden Roboter: Python-Code für
-Sensoren und Motoren, Shell-Skripte für den Start, Docker für
-die Umgebung. Warum braucht man noch ROS2?
 
-\begin{aufgabeBox}
-Verstehe, welche Probleme bei größeren Robotikprojekten entstehen
-und warum ROS2 diese systematisch löst.
-\end{aufgabeBox}
-
-\begin{problemBox}
-Ohne Framework muss jede Verbindung manuell programmiert werden.
-Bei 7~Sensoren und 5~Empfängern sind das 35~individuelle Verbindungen.
-Zeitstempel-Synchronisation, Visualisierung und Multi-Rechner-Betrieb
-erfordern jedes Mal eigenen Code.
-\end{problemBox}
-
-\begin{wissenBox}
-ROS2 bietet: Topics (Publish-Subscribe), Services (Anfrage-Antwort),
-Actions (Langläufer mit Feedback), Parameter, tf2
-(Koordinatentransformationen), rviz2 (Visualisierung),
-rosbag (Aufzeichnung), Gazebo-Integration (Simulation).
-\end{wissenBox}
+Das System ist jetzt vollständig:
+\texttt{sensor\_bridge.py} liest vom Arduino,
+\texttt{SensorBus} verteilt die Daten,
+\texttt{motor\_bridge.py} steuert die Motoren.
 
 \begin{lstlisting}[style=text]
-Ohne ROS2:                        Mit ROS2:
-sensor.py -> navigation.py        /scan Topic
-sensor.py -> anzeige.py      ==>  /scan Topic (alle subscriben)
-sensor.py -> karte.py             /scan Topic
-Jede Verbindung: eigener Code     Eine Nachricht, viele Empfaenger
+hinderniserkennung.ino
+    |  Serial /dev/arduino
+    v
+sensor_bridge.py  -->  SensorBus  -->  navigation_callback()
+                                  -->  logger_callback()
+                                  -->  motor_bridge.py
+                                            |
+                                       Serial /dev/arduino
+                                            v
+                                  differentialantrieb.ino
 \end{lstlisting}
 
+Es funktioniert. Warum also ROS2?
+
+\begin{aufgabeBox}
+Identifiziere die vier Grenzen des aktuellen Systems und
+verstehe, welches Problem ROS2 jeweils löst.
+\end{aufgabeBox}
+
+\section{Die vier Grenzen des selbstgebauten Systems}
+
+\textbf{1. Kein zweiter Rechner.}
+Alles läuft auf einem Raspberry Pi. Sobald ein zweiter
+Computer -- Laptop zum Debuggen, Server für schwere
+KI-Berechnungen -- hinzukommt, muss die gesamte
+Kommunikation neu geschrieben werden.
+\emph{ROS2 löst das: Discovery und Kommunikation über Netzwerk
+sind eingebaut.}
+
+\textbf{2. Kein Simulator.}
+Den Roboter testen bedeutet: Roboter rausstellen, starten,
+warten. Ohne Hardware kein Test.
+\emph{ROS2 löst das: Gazebo simuliert den Roboter vollständig --
+\texttt{sensor\_bridge.py} weiß nicht, ob es echten oder
+simulierten HC-SR04-Sensor liest.}
+
+\textbf{3. Keine Zeitstempel.}
+\texttt{SensorBus} übergibt Abstandswerte -- aber wann wurden
+sie gemessen? Bei 100\,Hz Sensor und 10\,Hz Navigation
+entstehen Synchronisierungsprobleme.
+\emph{ROS2 löst das: Jede Nachricht hat einen Header mit Timestamp
+und Frame-ID.}
+
+\textbf{4. Kein Standard-Visualisierungswerkzeug.}
+Debugging heißt: \texttt{print()}-Zeilen lesen.
+\emph{ROS2 löst das: rviz2 zeigt Sensordaten, Trajectories
+und Koordinatensysteme live in 3D.}
+
 \begin{merksatzBox}
-ROS2 ist kein Betriebssystem und keine Programmiersprache.
-Es ist ein Middleware-Framework: Es kümmert sich um die
-Kommunikation zwischen Programmen und stellt Werkzeuge bereit.
-Den Algorithmus musst du selbst schreiben.
+Das selbstgebaute System ist kein Fehler -- es ist Lernen.
+Wer Pipes, Serial-Kommunikation und Pub-Sub selbst
+implementiert hat, versteht ROS2 sofort: Es löst dieselben
+Probleme, nur auf industriellem Niveau.
 \end{merksatzBox}
 
 \begin{robotikBox}
-ROS2 nutzt DDS (Data Distribution Service) als Transport-Layer --
-einen ISO-Standard, der auch in der Luft- und Raumfahrt sowie
-Medizintechnik eingesetzt wird. Das macht ROS2 deterministisch,
-skalierbar und netzwerkfähig über mehrere Rechner hinweg.
+Jede Einschränkung oben entspricht einer ROS2-Komponente:
+Netzwerkkommunikation $\to$ DDS/rmw.
+Simulation $\to$ Gazebo + ros2\_control.
+Zeitstempel $\to$ std\_msgs/Header.
+Visualisierung $\to$ rviz2.
+Das sind keine optionalen Extras -- sie sind der Grund,
+warum ROS2 in professionellen Robotikprojekten Standard ist.
 \end{robotikBox}
 
 % ── Kapitel 26 ────────────────────────────────────────────────
-\chapter{Wir bauen ein Mini-ROS im Kopf}
+\chapter{Wir bauen den ROS2-Node-Graph im Kopf}
 
 \kapitelziel{
-Du kannst das Zusammenspiel von Nodes, Topics, Messages und
-Services anhand eines konkreten Roboterszenarios erklären.
+Du kannst den zukünftigen ROS2-Stack von robotik-uno-q
+mit Nodes, Topics und Services beschreiben.
 }
 \kapitelstruktur
 
 \section{Situation}
-Bevor du ein echtes ROS2-System mit Dutzenden Nodes siehst,
-baust du ein vereinfachtes Modell im Kopf.
+
+Bevor du ROS2 installierst und konfigurierst, baust du
+das Zielbild. In Band~2 wirst du jeden dieser Blöcke
+implementieren -- es hilft, jetzt zu wissen, wohin die Reise geht.
 
 \begin{aufgabeBox}
-Beschreibe den ROS2-Stack eines einfachen mobilen Roboters
-mit Nodes, Topics, Messages und einem Service.
+Zeichne den ROS2-Node-Graph für robotik-uno-q Stufe~2
+und benenne jeden Node, Topic und Service.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=text]
-Nodes und Topics:
-+------------------+  Topic: /scan (Float32)  +------------------+
-| ultraschall_node | -----------------------> | hindernis_node   |
-+------------------+                          +------------------+
-                                                       |
-                                             Topic: /cmd_vel (Twist)
-                                                       |
-+------------------+  Topic: /cmd_vel         +------------------+
-|  dashboard_node  | <----------------------- |   motor_node     |
-+------------------+                          +------------------+
-       |
-  Service: /get_status [std_srvs/Trigger]
+ROS2-Stack robotik-uno-q (Stufe 2):
+
+[arduino_bridge_node]        [hinderniserkennung.ino]
+    |  liest Serial /dev/arduino        (auf Arduino)
+    |
+    +--> Topic /sensor/links   (sensor_msgs/Range)
+    +--> Topic /sensor/rechts  (sensor_msgs/Range)
+    |
+    v
+[navigation_node]
+    |  subscribt auf /sensor/links + /sensor/rechts
+    |  berechnet Fahrbefehl
+    |
+    +--> Topic /cmd_vel  (geometry_msgs/Twist)
+    |
+    v
+[motor_node]               [differentialantrieb.ino]
+    |  subscribt auf /cmd_vel           (auf Arduino)
+    |  sendet Befehle ueber Serial
+    |
+    \--> Service /motor/stopp (std_srvs/Trigger)
+
+[logger_node]
+    |  subscribt auf /sensor/links + /cmd_vel
+    |  schreibt in stufe2_ros2/logs/
 \end{lstlisting}
 
 \begin{lstlisting}[style=text]
-Message-Typen:
-Float32 (std_msgs):     Twist (geometry_msgs):
-  float32 data            Vector3 linear   -> linear.x: 0.3 m/s
-  z.B.: data: 0.42        Vector3 angular  -> angular.z: 0.0 rad/s
+Vergleich: eigenes System vs. ROS2
+
+SensorBus.publish()         -> ros2 topic pub
+navigation_callback()       -> create_subscription(Twist, ...)
+motor_bridge.sende()        -> create_publisher(Twist, ...)
+/tmp/sensor_kanal  (FIFO)   -> /sensor/links (DDS Topic)
 \end{lstlisting}
 
 \begin{merksatzBox}
-\textbf{Node} = ein Programm (Python-Klasse, erbt von \texttt{Node}).\\
-\textbf{Topic} = benannter Kanal, z.\,B. \texttt{/scan}.\\
-\textbf{Message} = Datenstruktur, die über Topic fließt.\\
-\textbf{Publisher} = schreibt auf Topic.\\
-\textbf{Subscriber} = liest von Topic.\\
-\textbf{Service} = synchrone Anfrage-Antwort.
+Die Konzepte sind dieselben.
+Die Implementierung ist professioneller.
+Wer den eigenen Bus versteht, versteht ROS2 sofort.
 \end{merksatzBox}
-
-\begin{robotikBox}
-Das Pub-Sub-Muster aus Kapitel 22 (eigener MessageBus) ist
-konzeptionell identisch mit ROS2-Topics. ROS2 fügt hinzu:
-automatische Discovery, typsichere Messages und netzweite
-Kommunikation -- das Prinzip bleibt dasselbe.
-\end{robotikBox}
 
 % ── Kapitel 27 ────────────────────────────────────────────────
 \chapter{Wir richten die Robotik-Werkstatt vollständig ein}
 
 \kapitelziel{
-Du hast eine vollständige, dokumentierte Entwicklungsumgebung
-für ROS2 auf Basis von Docker -- bereit für Band 2.
+Die gesamte Entwicklungsumgebung für robotik-uno-q ist
+eingerichtet: Docker, Git, udev, VS Code, ROS2.
+Bereit für Band~2.
 }
 \kapitelstruktur
 
 \section{Situation}
-Alle Werkzeuge sind vorhanden. Jetzt fügen wir sie zur
-vollständigen Robotik-Werkstatt zusammen.
+
+Alle Einzelteile sind da. Jetzt fügen wir sie zusammen
+zur vollständigen Robotik-Werkstatt. Nach diesem Kapitel
+kannst du sofort mit Band~2 beginnen.
 
 \begin{aufgabeBox}
-Richte die komplette Entwicklungsumgebung ein:
-ROS2 via Docker, VS Code Remote, Git, udev für Arduino.
+Prüfe die vollständige Einrichtung und vervollständige
+fehlende Teile. Das Ergebnis ist eine Checkliste,
+die du bei jedem neuen Roboter-Rechner abarbeiten kannst.
 \end{aufgabeBox}
 
+\section{Die Einrichtungs-Checkliste}
+
 \begin{lstlisting}[style=bash]
-# 1. Docker einrichten
-sudo apt install docker.io docker-compose
-sudo usermod -aG docker $USER && newgrp docker
+# 1. Projekt geklont und Umgebungsvariable gesetzt
+ls ~/robotik-uno-q/stufe2_ros2/src/sensor_bridge.py  || echo "FEHLT"
+grep ROBOTIK ~/.bashrc || echo 'export ROBOTIK=~/robotik-uno-q' >> ~/.bashrc
+source ~/.bashrc
 
-# 2. Projektstruktur
-mkdir -p ~/robotik/{config,src,scripts,logs}
-cd ~/robotik && git init
+# 2. udev: Arduino als /dev/arduino erreichbar
+ls /dev/arduino 2>/dev/null || echo "udev-Regel fehlt -- Kapitel 23"
 
-# 3. docker-compose.yml anlegen (nano oder VS Code)
-# Inhalt: ros:jazzy Image, Volumes fuer src/ und logs/
+# 3. Python-Abhaengigkeiten
+python3 -c "import serial, yaml" 2>/dev/null || pip3 install pyserial pyyaml
 
-# 4. ROS2-Container testen
-docker-compose run ros2 bash -c \
-    "source /opt/ros/jazzy/setup.bash && ros2 --version"
+# 4. Docker + Compose
+docker --version && docker-compose --version
 
-# 5. udev-Regel fuer Arduino
-echo 'SUBSYSTEM=="tty",ATTRS{idVendor}=="2341",SYMLINK+="arduino",MODE="0666"' \
-    | sudo tee /etc/udev/rules.d/99-arduino.rules
-sudo udevadm control --reload-rules
+# 5. Git konfiguriert
+git config user.name  || git config --global user.name "Wolfgang Becker"
+git config user.email || git config --global user.email "w.becker@schule.de"
 
-# 6. SSH-Key fuer VS Code Remote
-ssh-keygen -t ed25519 -f ~/.ssh/robotik_key
-\end{lstlisting}
+# 6. GitHub-Verbindung
+ssh -T git@github.com 2>&1 | grep -q "successfully" && echo "GitHub OK"
 
-\begin{lstlisting}[style=yaml]
-# docker-compose.yml fuer die Werkstatt
-version: '3.8'
-services:
-  ros2:
-    image: ros:jazzy
-    volumes:
-      - ./src:/robotik/src
-      - ./config:/robotik/config
-      - ./logs:/root/.ros/log
-    working_dir: /robotik
-    stdin_open: true
-    tty: true
-    network_mode: host
+# 7. ROS2-Container testen
+docker run --rm ros:jazzy \
+    bash -c "source /opt/ros/jazzy/setup.bash && ros2 --version"
+
+echo "=== Robotik-Werkstatt bereit ==="
 \end{lstlisting}
 
 \begin{loesungBox}
-\textbf{Täglicher Workflow:}
+\textbf{Erster vollständiger Test des gesamten Systems:}
 \begin{lstlisting}[style=bash]
-cd ~/robotik
-git pull                            # Aktuellen Stand holen
-docker-compose run ros2 bash        # ROS2-Umgebung betreten
-source /opt/ros/jazzy/setup.bash    # ROS2 aktivieren
-# ... entwickeln und testen ...
-exit
-git add . && git commit -m "..."    # Versionieren
-git push                            # Sichern und teilen
+cd ~/robotik-uno-q
+
+# Arduino anstecken, dann:
+docker-compose run --rm \
+    -v /dev/arduino:/dev/arduino \
+    ros2 \
+    python3 stufe2_ros2/src/sensor_bridge.py
+
+# Erwartete Ausgabe:
+# [sensor_bridge] /dev/arduino @ 9600 Baud
+# SENSOR   87  124
+# SENSOR   86  123
 \end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{robotik-uno-q nach Band~1:}
+\begin{itemize}
+  \item \texttt{stufe1\_mcu/}: Drei funktionsfähige Arduino-Sketches
+  \item \texttt{stufe2\_ros2/}: sensor\_bridge, motor\_bridge, SensorBus
+  \item \texttt{config/}: sensor\_config.yaml
+  \item \texttt{scripts/}: start\_roboter.sh
+  \item \texttt{docker-compose.yml}: Reproduzierbarer Stack
+  \item \texttt{.gitignore}: Keine Logs im Repo
+  \item systemd-Service: Automatischer Start
+  \item udev-Regel: \texttt{/dev/arduino} stabil
+  \item VS Code: Arduino + Python + Remote-SSH
+  \item GitHub: Täglich gepusht
+\end{itemize}
+\end{projektBox}
+
 \begin{merksatzBox}
-Die Werkstatt ist fertig, wenn: ROS2 im Container läuft,
-Code versioniert in Git liegt, Hardware per udev stabil
-erreichbar ist und Remote-Entwicklung über SSH möglich ist.
-Erst dann beginnt Band 2.
+Die Werkstatt ist fertig, wenn alle zehn Punkte der
+Checkliste grün sind. Dann beginnt Band~2.
 \end{merksatzBox}
 
 % ── Kapitel 28 ────────────────────────────────────────────────
-\chapter{Ausblick: Was passiert in Band 2 und Band 3?}
+\chapter{Ausblick: Band 2 und Band 3}
 
 \kapitelziel{
-Du weißt, was dich in den nächsten Bänden erwartet, und
-erkennst, wie Band 1 das Fundament für alles Folgende legt.
+Du weißt, was in Band~2 und Band~3 folgt, und erkennst,
+wie jede Lektion aus Band~1 direkt dort weitergeht.
 }
 
 \section{Was du jetzt kannst}
 
-Du hast in Band 1 gelernt:
 \begin{itemize}
-  \item Linux navigieren, Dateien verwalten, Prozesse steuern
-  \item Konfigurationsdateien bearbeiten, Skripte schreiben
-  \item Projekte strukturieren und mit VS Code remote entwickeln
-  \item Git für Versionsverwaltung und GitHub für Zusammenarbeit
-  \item Docker für reproduzierbare Umgebungen
-  \item IPC-Grundlagen und das Publish-Subscribe-Muster
-  \item USB-Hardware einbinden und mit Arduino kommunizieren
-  \item ROS2-Konzepte: Nodes, Topics, Messages, Services
+  \item Linux navigieren und Fehler systematisch debuggen
+  \item YAML-Konfiguration von Code trennen
+  \item Shell-Skripte und systemd-Dienste schreiben
+  \item VS Code mit Remote-SSH nutzen
+  \item Git mit sinnvollen Commits führen
+  \item Docker-Container für reproduzierbare Umgebungen
+  \item Serial-Kommunikation implementieren und parsen
+  \item Publish-Subscribe-Muster anwenden
+  \item udev-Regeln für stabile Gerätepfade
+  \item ROS2-Konzepte: Nodes, Topics, Services
 \end{itemize}
-
-Das ist kein Vorwissen -- das ist das Fundament.
 
 \section{Band 2: Python für Robotik}
 
-In Band 2 programmierst du deinen MobileRobot-1 in Python:
-Sensorauswertung, Bewegungssteuerung, Hinderniserkennung, Navigation.
-Und am Ende: dein erster eigener ROS2-Node.
+In Band~2 wird \texttt{stufe2\_ros2/} zu einem echten
+ROS2-Paket. Du ersetzt \texttt{SensorBus} durch
+\texttt{rclpy}-Publisher, \texttt{sensor\_bridge.py}
+wird zum \texttt{sensor\_bridge\_node}, und am Ende
+fährt der Roboter autonom.
 
 \begin{lstlisting}[style=python]
-# Vorschau: Band 2 -- erster ROS2-Node
-class MobilRoboter(Node):
-    def __init__(self):
-        super().__init__('mobile_robot')
-        self.sub = self.create_subscription(
-            Float32, '/scan', self.scan_callback, 10)
-        self.pub = self.create_publisher(
-            Twist, '/cmd_vel', 10)
+# Band 2 -- arduino_bridge_node.py (Vorschau)
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Range
 
-    def scan_callback(self, msg):
-        cmd = Twist()
-        if msg.data < 0.25:
-            cmd.linear.x = 0.0   # STOPP
-        else:
-            cmd.linear.x = 0.3   # vorwaerts
-        self.pub.publish(cmd)
+class ArduinoBridgeNode(Node):
+    def __init__(self):
+        super().__init__('arduino_bridge')
+        self.pub_rechts = self.create_publisher(
+            Range, '/sensor/rechts', 10)
+        self.pub_links  = self.create_publisher(
+            Range, '/sensor/links',  10)
+        self.timer = self.create_timer(0.1, self.lese_arduino)
+
+    def lese_arduino(self):
+        # Liest von /dev/arduino, published Range-Nachrichten
+        pass
 \end{lstlisting}
 
 \section{Band 3: ROS2 vertieft}
 
-Band 3 zeigt den vollständigen ROS2-Stack:
+Band~3 zeigt den vollständigen Stack:
 SLAM (Karte erstellen), Nav2 (autonom navigieren),
-Sensorfusion, Launch-Dateien und Deployment auf dem echten Roboter.
+\texttt{micro\_ROS} (Arduino direkt in ROS2),
+und Deployment auf dem echten Roboter.
 
 \begin{merksatzBox}
-Die Robotik-Werkstatt ist keine Vorstufe -- sie ist der Boden,
-auf dem alles Folgende steht. Wer Linux, Git und Docker beherrscht,
-bewegt sich in ROS2 wie zu Hause.
+Die Robotik-Werkstatt ist kein Vorwissen -- sie ist das Fundament.
+Linux, Git, Docker und Serial-Kommunikation sind
+keine Hilfsmittel. Sie sind das Handwerkszeug,
+mit dem Robotikentwickler täglich arbeiten.
+Wer sie beherrscht, bewegt sich in ROS2 wie zu Hause.
 \end{merksatzBox}
 
 \begin{robotikBox}
-\textbf{Dein MobileRobot-1 nach Band 3:}
-\begin{itemize}
-  \item Fährt autonom und weicht Hindernissen aus
-  \item Erstellt eine Karte seiner Umgebung (SLAM)
-  \item Navigiert zu einem vorgegebenen Zielpunkt (Nav2)
-  \item Wird von ROS2 auf Raspberry Pi gesteuert
-  \item Startet nach dem Einschalten automatisch
-\end{itemize}
-Das ist das Ziel. Band 1 war der erste Schritt.
+\textbf{robotik-uno-q nach Band~3:}
+Fährt autonom, erstellt eine Karte seiner Umgebung (SLAM),
+navigiert zu einem Zielpunkt (Nav2), kommuniziert über
+\texttt{micro\_ROS} ohne Serial-Bridge, startet nach
+dem Einschalten vollautomatisch -- und der gesamte Code
+liegt versioniert auf \texttt{github.com/wollbaer1971/robotik-uno-q}.
 \end{robotikBox}
