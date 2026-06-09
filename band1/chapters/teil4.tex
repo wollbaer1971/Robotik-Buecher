@@ -5,155 +5,217 @@
 \chapter{Wir wollen ein Projekt übersichtlich anlegen}
 
 \kapitelziel{
-Du kannst ein Robotikprojekt mit einer sinnvollen Verzeichnisstruktur
-anlegen, die mit ROS2 kompatibel ist.
+Du kennst die vollständige Verzeichnisstruktur von
+robotik-uno-q und verstehst, warum jeder Ordner
+seinen Platz hat.
 }
 \kapitelstruktur
 
 \section{Situation}
-Dein Robotikprojekt hat Python-Skripte, Konfigurationsdateien,
-Logdateien und Dokumentation. Alles liegt im selben Ordner.
-Suchen dauert länger als Programmieren.
+
+Das Projekt wächst. \texttt{stufe2\_ros2/} hat jetzt
+\texttt{src/}, \texttt{config/}, \texttt{logs/} und bald
+kommen Tests, Dokumentation und Launch-Dateien dazu.
+Gleichzeitig liegt \texttt{stufe1\_mcu/} mit Arduino-Code
+im selben Repo. Und \texttt{docs/} mit Schaltplänen.
+
+Wer das Projekt öffnet, soll in 30 Sekunden verstehen,
+was wo liegt -- ohne zu fragen.
 
 \begin{aufgabeBox}
-Lege eine übersichtliche Projektstruktur an, die auch für
-spätere ROS2-Integration vorbereitet ist.
+Vervollständige die \texttt{stufe2\_ros2/}-Struktur auf
+ROS2-kompatiblen Standard und dokumentiere die Projektstruktur
+in \texttt{docs/}.
 \end{aufgabeBox}
 
-\begin{problemBox}
-Keine Struktur bedeutet: Dateien verlieren, Versionen
-durcheinander bringen, Kollegen nicht einbeziehen können.
-\end{problemBox}
-
-\section{Die empfohlene Projektstruktur}
+\section{Die vollständige Projektstruktur}
 
 \begin{lstlisting}[style=text]
-~/robotik/
-├── README.md              # Projektbeschreibung
-├── .gitignore             # Was Git ignorieren soll
-├── docs/                  # Dokumentation
-├── config/                # YAML-Konfigurationsdateien
-│   ├── roboter.yaml
-│   └── kamera.yaml
-├── scripts/               # Hilfsskripte
-│   └── start_alle.sh
-├── src/                   # Python-Quellcode
-│   ├── sensoren.py
-│   ├── motoren.py
-│   └── navigation.py
-├── tests/                 # Tests
-├── logs/                  # Laufzeit-Logs (in .gitignore)
-└── ros2_ws/               # ROS2-Workspace (spaeter)
-    └── src/
+robotik-uno-q/
+├── README.md                  Was ist das Projekt?
+├── .gitignore                 Was ignoriert Git?
+│
+├── stufe1_mcu/                Arduino C++ (laeuft schon)
+│   ├── differentialantrieb/
+│   ├── hinderniserkennung/
+│   └── linienfolger/
+│
+├── stufe2_ros2/               Python + ROS2 (wir bauen das)
+│   ├── src/
+│   │   └── sensor_bridge.py
+│   ├── config/
+│   │   └── sensor_config.yaml
+│   ├── launch/                (in Band 2: ros2 launch)
+│   ├── tests/                 (spaeter: pytest)
+│   └── logs/                  (in .gitignore!)
+│
+├── stufe3_wifi/               WiFi-Kommunikation (Band 3)
+│
+├── docs/
+│   ├── Verdrahtung.md         Schaltplan Stufe 1
+│   ├── architektur.md         (heute anlegen)
+│   └── pics/
+│
+├── notebooks/                 Jupyter (Kinematik, Kalibrierung)
+│
+├── atopile/                   KiCad PCB
+└── scripts/
+    └── start_roboter.sh
 \end{lstlisting}
 
 \begin{loesungBox}
 \begin{lstlisting}[style=bash]
-# Komplette Struktur mit einem Skript anlegen
-mkdir -p ~/robotik/{docs,config,scripts,src,tests,logs}
-touch ~/robotik/README.md
-touch ~/robotik/.gitignore
+cd ~/robotik-uno-q
 
-# .gitignore befuellen
-cat > ~/robotik/.gitignore << 'GITEOF'
-logs/
-__pycache__/
-*.pyc
-*.log
-.DS_Store
-GITEOF
+# Fehlende Ordner erganzen
+mkdir -p stufe2_ros2/launch stufe2_ros2/tests
 
-echo "Projektstruktur angelegt."
-ls ~/robotik/
+# Architektur-Dokument anlegen
+cat > docs/architektur.md << 'MDEOF'
+# Systemarchitektur robotik-uno-q
+
+## Stufen
+
+| Stufe | Technologie | Status |
+|-------|------------|--------|
+| 1     | Arduino C++ (L298N, HC-SR04) | fertig |
+| 2     | Python + ROS2 | in Entwicklung |
+| 3     | WiFi / MQTT | geplant |
+
+## Kommunikation
+
+stufe1_mcu  <-- Serial /dev/ttyUSB0 -->  stufe2_ros2
+stufe2_ros2  <-- ROS2 Topics -->  Navigation + Motor
+MDEOF
+
+echo "Struktur komplett."
+tree robotik-uno-q/   # apt install tree
 \end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} Teile der Struktur gewachsen.\\
+\textbf{Heute:} Vollständige, dokumentierte Projektstruktur.
+Jeder Ordner hat einen Zweck.\\
+\textbf{Nächstes Kapitel:} VS Code als komfortable IDE einrichten.
+\end{projektBox}
+
 \begin{merksatzBox}
-Struktur von Anfang an. Eine gute Verzeichnisstruktur kostet
-10 Minuten einmalig und spart Stunden später. Sie ist auch
-die Einladungskarte für Kollegen: Wer den Ordner öffnet,
-soll sofort verstehen, wo was ist.
+Eine gute Projektstruktur ist die Einladungskarte für Kollegen.
+Wer das Repo klont, soll in 30 Sekunden wissen: wo ist der Code?
+Wo sind Tests? Wo ist die Dokumentation?
+\texttt{README.md} beantwortet \emph{Was ist das?}
+\texttt{docs/architektur.md} beantwortet \emph{Wie funktioniert es?}
 \end{merksatzBox}
 
 \begin{robotikBox}
-Ein ROS2-Paket hat eine vorgeschriebene Struktur:
-\texttt{package.xml}, \texttt{setup.py}, \texttt{resource/}, \texttt{launch/}.
-Wer schon eine saubere Projektstruktur hat, findet sich in
-ROS2-Paketen sofort zurecht -- die Prinzipien sind identisch.
+Ein ROS2-Paket erzwingt eine Struktur: \texttt{package.xml},
+\texttt{setup.py}, \texttt{resource/}, \texttt{launch/}.
+Die Ordner \texttt{stufe2\_ros2/src/}, \texttt{config/} und
+\texttt{launch/} entsprechen exakt dieser Konvention.
+Wenn Band~2 das Paket formalisiert, ist fast nichts zu verschieben.
 \end{robotikBox}
 
+% ── Kapitel 12 ────────────────────────────────────────────────
 \chapter{Wir wollen komfortabel programmieren}
 
 \kapitelziel{
-Du kannst VS Code für Robotikentwicklung einrichten und effektiv
-nutzen -- lokal und über SSH auf dem Roboter.
+Du richtest VS Code für robotik-uno-q ein: mit
+Arduino-Unterstützung, Python-Linting und direktem
+Remote-Zugriff auf den Raspberry Pi.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du entwickelst auf dem Laptop, der Roboter läuft auf einem
-Raspberry Pi. Code übertragen, ausführen, debuggen -- das
-muss reibungslos gehen.
+
+Du entwickelst gleichzeitig Arduino-Code in \texttt{stufe1\_mcu/}
+und Python in \texttt{stufe2\_ros2/}. Mit \texttt{nano} allein
+ist das mühsam: keine Autovervollständigung, kein Syntax-Highlighting
+für \texttt{.ino}-Dateien, kein direkter Upload.
 
 \begin{aufgabeBox}
-Richte VS Code so ein, dass du direkt auf dem Raspberry Pi
-programmieren kannst, als wäre es dein lokaler Rechner.
+Richte VS Code so ein, dass du in einer IDE sowohl
+Arduino- als auch Python-Code für robotik-uno-q entwickelst --
+und bei Bedarf direkt auf dem Raspberry Pi.
 \end{aufgabeBox}
-
-\begin{problemBox}
-Terminal-Editoren allein sind für größere Projekte zu langsam.
-Aber grafische IDEs erreichen den Roboter nicht direkt.
-\end{problemBox}
 
 \section{VS Code einrichten}
 
 \begin{lstlisting}[style=bash]
-# Installation (Ubuntu)
-sudo apt install code
+# VS Code installieren (Ubuntu/Debian)
+sudo apt install code   # oder von code.visualstudio.com
 
-# Wichtige Extensions (im VS Code Terminal installieren):
-# Python (ms-python.python)
-# Remote - SSH (ms-vscode-remote.remote-ssh)
-# YAML (redhat.vscode-yaml)
-# GitLens (eamodio.gitlens)
+# Extensions installieren (Strg+Shift+X):
+# - Python          (ms-python.python)
+# - Arduino         (vsciot-vscode.vscode-arduino)
+# - YAML            (redhat.vscode-yaml)
+# - Remote - SSH    (ms-vscode-remote.remote-ssh)
+# - GitLens         (eamodio.gitlens)
 \end{lstlisting}
 
-\begin{lstlisting}[style=text]
-# ~/.ssh/config -- SSH-Verbindung konfigurieren
-Host roboter
-    HostName 192.168.1.100
-    User ros
-    IdentityFile ~/.ssh/id_rsa
+\begin{lstlisting}[style=json]
+// .vscode/settings.json im Projektordner
+{
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "arduino.path": "/usr/share/arduino",
+  "arduino.additionalUrls": [
+    "https://raw.githubusercontent.com/stm32duino/BoardManagerFiles/main/package_stmicroelectronics_index.json"
+  ],
+  "yaml.schemas": {
+    "file://config/sensor_config.yaml": "stufe2_ros2/config/*.yaml"
+  }
+}
 \end{lstlisting}
+
+\section{Remote-SSH auf den Raspberry Pi}
 
 \begin{lstlisting}[style=bash]
 # SSH-Key generieren (einmalig)
-ssh-keygen -t rsa -b 4096
-ssh-copy-id ros@192.168.1.100
+ssh-keygen -t ed25519 -C "robotik-uno-q"
+ssh-copy-id ros@192.168.1.100   # IP des Raspberry Pi
 
-# Jetzt per VS Code: Strg+Shift+P -> "Remote-SSH: Connect to Host"
-# -> "roboter" -> Passwortlos einloggen
+# ~/.ssh/config
+Host roboter-pi
+    HostName 192.168.1.100
+    User ros
+    IdentityFile ~/.ssh/id_ed25519
+\end{lstlisting}
+
+\begin{lstlisting}[style=text]
+Dann in VS Code:
+Strg+Shift+P -> "Remote-SSH: Connect to Host"
+-> "roboter-pi"
+-> Ordner oeffnen: ~/robotik-uno-q
 \end{lstlisting}
 
 \begin{loesungBox}
-\textbf{Remote-Workflow:}
-\begin{enumerate}
-  \item VS Code öffnen → Remote-SSH → Roboter verbinden
-  \item Projektordner \texttt{\textasciitilde/robotik} öffnen
-  \item Code bearbeiten, Terminal nutzen, Dateien speichern
-  \item Alles läuft auf dem Roboter -- kein manuelles Übertragen
-\end{enumerate}
+Nach der Einrichtung:
+\begin{itemize}
+  \item Lokaler Rechner: VS Code öffnet das Projekt.
+  \item Arduino-Code: \texttt{.ino}-Dateien mit Syntax-Highlighting.
+  \item Python-Code: Autovervollständigung und Linting.
+  \item Raspberry Pi: Remote-SSH -- Code läuft auf dem Pi, Editor ist lokal.
+  \item Git: Änderungen sind sofort im Source-Control-Tab sichtbar.
+\end{itemize}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} Vollständige Projektstruktur.\\
+\textbf{Heute:} VS Code mit Arduino- und Python-Support,
+Remote-SSH für den Raspberry Pi.\\
+\textbf{Nächstes Kapitel:} Git-History des Projekts weiterführen.
+\end{projektBox}
+
 \begin{merksatzBox}
-SSH + VS Code Remote ist der professionelle Standard für
-Embedded-Entwicklung. Einmal eingerichtet, ist der Remote-Rechner
-genauso komfortabel zu bedienen wie der lokale.
+Remote-SSH ist der Industriestandard für Embedded-Entwicklung.
+Der Code läuft auf dem Roboter, du schreibst ihn am Laptop.
+Kein manuelles Kopieren, kein Dateiübertragen -- VS Code
+synchronisiert alles über SSH.
 \end{merksatzBox}
 
 \begin{robotikBox}
-ROS2-Entwickler arbeiten meist mit VS Code + Remote-SSH,
-weil der Roboter keinen eigenen Bildschirm hat. Die ROS2-Extension
-für VS Code bietet zusätzlich Topic-Browser und Node-Graph
-direkt in der IDE.
+VS Code hat eine offizielle ROS2-Extension, die den Node-Graph
+visualisiert, Topics anzeigt und direkt \texttt{ros2 run}
+aus der IDE startet. Wenn Band~2 beginnt, ist VS Code
+bereits als IDE eingerichtet -- nur die ROS2-Extension kommt noch dazu.
 \end{robotikBox}
