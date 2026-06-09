@@ -5,199 +5,245 @@
 \chapter{Wir wollen zwei Programme miteinander sprechen lassen}
 
 \kapitelziel{
-Du verstehst, wie Linux-Prozesse miteinander kommunizieren können
-und kennst die grundlegenden IPC-Mechanismen.
+Du verstehst, wie Prozesse Daten austauschen, und implementierst
+die Serial-Brücke zwischen hinderniserkennung.ino
+und sensor\_bridge.py.
 }
 \kapitelstruktur
 
 \section{Situation}
-Dein Sensor-Programm liest Werte, dein Navigations-Programm
-braucht diese Werte -- aber sie laufen in getrennten Prozessen.
-Wie kommen die Daten von A nach B?
+
+\texttt{hinderniserkennung.ino} läuft auf dem Arduino und
+sendet alle 100\,ms eine Zeile über Serial:
+
+\begin{lstlisting}[style=text]
+R=87 cm  L=124 cm
+R=86 cm  L=123 cm
+R=41 cm  L=122 cm
+Bremsen
+R=15 cm  L=120 cm
+Hindernis rechts -- links ausweichen
+\end{lstlisting}
+
+Diese Daten soll \texttt{sensor\_bridge.py} empfangen,
+parsen und weiterreichen -- an Navigation, Logging, Dashboard.
 
 \begin{aufgabeBox}
-Lass zwei Python-Programme über eine Pipe miteinander
-kommunizieren.
+Implementiere \texttt{sensor\_bridge.py} so, dass es
+die Serial-Daten vom Arduino liest und über eine Named Pipe
+(FIFO) an einen zweiten Prozess weitergibt.
 \end{aufgabeBox}
 
-\begin{problemBox}
-Prozesse haben getrennte Speicherbereiche. Sie können nicht
-einfach Variablen teilen. Kommunikation braucht explizite Kanäle.
-\end{problemBox}
-
 \begin{wissenBox}
-Wir brauchen: Pipes, Named Pipes (FIFOs), Sockets und den
-Unterschied zwischen synchroner und asynchroner Kommunikation.
+Wir brauchen: Pipes, Named Pipes (FIFOs), das Lesen von
+Serial-Daten mit pyserial und das Flush-Problem bei Pipes.
 \end{wissenBox}
 
-\section{Pipes -- der einfachste Weg}
+\begin{haubeBox}
+\textbf{Warum gibt es in Linux überhaupt Pipes?}
 
-\begin{lstlisting}[style=bash]
-# Unix-Pipe: Ausgabe von Programm A als Eingabe von Programm B
-python3 sensor_ausgabe.py | python3 navigation_eingabe.py
+Unix wurde für Systeme mit wenig Speicher entworfen.
+Statt ein riesiges Programm zu schreiben, das alles kann,
+kombiniert man viele kleine -- jedes tut genau eine Sache gut.
+Die Pipe ist das Verbindungsstück zwischen ihnen.
 
-# Named Pipe (FIFO) -- persistenter Kanal
-mkfifo /tmp/sensor_kanal
+\texttt{cat daten.txt | grep "Hindernis" | wc -l}
+-- drei Programme, eine Pipeline. Dieses Prinzip heißt
+\textit{Unix Philosophy}. Es ist 50 Jahre alt und noch
+heute der Kern moderner Systemarchitektur.
+ROS2-Topics sind Pipes mit Netzwerkfähigkeit und Typsicherheit.
+\end{haubeBox}
 
-# Terminal 1: Daten senden
-python3 -c "
-import time
-with open('/tmp/sensor_kanal', 'w') as f:
-    for i in range(10):
-        f.write(f'{i * 0.1:.2f}\n')
-        f.flush()
-        time.sleep(0.5)
-"
-
-# Terminal 2: Daten empfangen
-python3 -c "
-with open('/tmp/sensor_kanal', 'r') as f:
-    for line in f:
-        print(f'Empfangen: {line.strip()}')
-"
-\end{lstlisting}
-
-\section{Sockets -- netzwerkfähige Kommunikation}
+\section{sensor\_bridge.py -- die echte Implementierung}
 
 \begin{lstlisting}[style=python]
-# sensor_server.py -- Sensorwerte senden
-import socket, time, random
+#!/usr/bin/env python3
+# stufe2_ros2/src/sensor_bridge.py -- Version 0.3
+# Liest Serial-Daten von hinderniserkennung.ino
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(('localhost', 9000))
-server.listen(1)
-print("Warte auf Verbindung...")
-conn, addr = server.accept()
+import serial, sys, re, yaml
+from pathlib import Path
 
-while True:
-    wert = round(random.uniform(0.1, 2.0), 2)
-    conn.send(f"{wert}\n".encode())
-    time.sleep(0.5)
-\end{lstlisting}
+CONFIG = Path(__file__).parent.parent / "config" / "sensor_config.yaml"
 
-\begin{lstlisting}[style=python]
-# navigations_client.py -- Sensorwerte empfangen
-import socket
+def lade_config():
+    with open(CONFIG) as f:
+        return yaml.safe_load(f)
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect(('localhost', 9000))
+def parse_zeile(zeile):
+    # Parst "R=87 cm  L=124 cm" -> (87, 124) oder None
+    m = re.match(r'R=(\d+)\s+cm\s+L=(\d+)\s+cm', zeile.strip())
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
 
-while True:
-    daten = client.recv(1024).decode().strip()
-    abstand = float(daten)
-    if abstand < 0.25:
-        print(f"WARNUNG: Hindernis bei {abstand} m")
-    else:
-        print(f"Frei: {abstand} m")
+def main():
+    config  = lade_config()
+    port    = config['serial'].get('port', '/dev/arduino')
+    baud    = config['serial']['baudrate']
+    timeout = config['serial']['timeout_s']
+
+    print(f"[sensor_bridge] {port} @ {baud} Baud")
+    try:
+        ser = serial.Serial(port, baud, timeout=timeout)
+        for zeile in ser:
+            text = zeile.decode('utf-8', errors='replace').strip()
+            ergebnis = parse_zeile(text)
+            if ergebnis:
+                r, l = ergebnis
+                # SENSOR-Zeilen auf stdout fuer Pipe-Weiterleitung
+                print(f"SENSOR {r:4d} {l:4d}")
+                sys.stdout.flush()  # Pflicht bei Pipe!
+            else:
+                print(f"INFO  {text}", file=sys.stderr)
+    except serial.SerialException as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 \end{lstlisting}
 
 \begin{loesungBox}
-Für einfache Kommunikation auf demselben Rechner: Named Pipe.
-Für netzwerkfähige Kommunikation (Roboter ↔ Laptop): Socket.
-Für komplexe Systeme mit vielen Teilnehmern: ROS2 Topics.
+\textbf{Mit simuliertem Arduino testen (kein Hardware nötig):}
+\begin{lstlisting}[style=bash]
+# Terminal 1: Arduino simulieren
+python3 -c "
+import time, sys
+for i in range(20):
+    print(f'R={80-i*3} cm  L={100+i} cm')
+    sys.stdout.flush()
+    time.sleep(0.2)
+" > /tmp/arduino_sim.fifo &
+
+# Named Pipe anlegen
+mkfifo /tmp/sensor_kanal
+
+# Terminal 2: sensor_bridge lesen (nicht ausfuehren -- nur Konzept)
+# python3 src/sensor_bridge.py < /tmp/sensor_kanal
+\end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} Sensor-Bridge hatte nur Platzhalter.\\
+\textbf{Heute:} Echte Serial-Kommunikation -- parst das
+Arduino-Protokoll \texttt{R=XX cm  L=YY cm} direkt.\\
+\textbf{Nächstes Kapitel:} Daten per Pub-Sub verteilen.
+\end{projektBox}
+
 \begin{merksatzBox}
-IPC (Inter-Process Communication) ist das Fundament vernetzter
-Systeme. Pipes sind einfach, aber eingeschränkt. Sockets sind
-flexibel und netzwerkfähig. ROS2 baut auf DDS auf -- einem
-industriellen Nachrichtenprotokoll, das Sockets weit übertrifft.
+\texttt{sys.stdout.flush()} in Pipe-Anwendungen ist Pflicht.
+Ohne explizites Flush puffert Python -- der nachfolgende
+Prozess wartet ewig auf Daten, die längst berechnet wurden.
 \end{merksatzBox}
 
 \begin{robotikBox}
-ROS2's DDS-Middleware ist ein hochentwickeltes IPC-System:
-Topics sind Named Pipes, die automatisch entdeckt werden
-(\textit{Discovery}), mit Typsicherheit und Quality-of-Service-Garantien.
-Der Schritt von Socket zu ROS2-Topic ist konzeptionell klein.
+Das Parsing in \texttt{parse\_zeile()} macht genau das,
+was in Band~2 ein ROS2-Subscriber-Callback tut:
+Rohdaten empfangen, validieren, in ein Datenobjekt konvertieren.
+Der Code ändert sich minimal -- er bekommt nur einen ROS2-Rahmen.
 \end{robotikBox}
 
 % ── Kapitel 22 ────────────────────────────────────────────────
 \chapter{Wir wollen Nachrichten statt direkter Befehle senden}
 
 \kapitelziel{
-Du verstehst das Publish-Subscribe-Muster und kannst es
-in Python implementieren -- als Vorbereitung für ROS2-Topics.
+Du implementierst Publish-Subscribe für robotik-uno-q:
+Sensor-Daten fließen vom Arduino zu Navigation und Logger
+ohne direkte Kopplung zwischen den Modulen.
 }
 \kapitelstruktur
 
 \section{Situation}
-Sensor, Navigation und Anzeige sollen alle Abstandswerte bekommen.
-Mit direkten Verbindungen (A→B, A→C) wird der Code zu einem
-Geflecht von Abhängigkeiten.
+
+\texttt{sensor\_bridge.py} liefert Abstandswerte.
+Navigation, Logger und Dashboard sollen alle empfangen.
+Drei direkte Verbindungen würden den Code eng koppeln --
+jede neue Komponente erfordert Änderungen an sensor\_bridge.
 
 \begin{aufgabeBox}
-Implementiere ein einfaches Publish-Subscribe-System, bei dem
-ein Sender Daten veröffentlicht und mehrere Empfänger diese
-unabhängig voneinander erhalten.
+Implementiere einen internen Message-Bus für robotik-uno-q,
+der Sensordaten an beliebig viele Abnehmer verteilt.
 \end{aufgabeBox}
 
 \begin{analogie}
-Publish-Subscribe ist wie ein Radiosender: Der Sender (Publisher)
-sendet ins Leere. Wer zuhören will (Subscriber), schaltet ein.
-Der Sender kümmert sich nicht darum, wie viele zuhören.
+Publish-Subscribe ist wie ein Radiosender. Der Sender
+schickt ins Leere -- er weiß nicht, wer zuhört.
+Navigation, Logger und Dashboard schalten sich ein,
+wenn sie wollen. Der Sender ändert sich nie.
 \end{analogie}
 
 \begin{lstlisting}[style=python]
-# pubsub.py -- Minimales Publish-Subscribe in Python
-import threading, time, random
+# stufe2_ros2/src/bus.py -- Interner Message-Bus
 from collections import defaultdict
+import threading
 
-class MessageBus:
-    """Einfacher Message-Bus: Publish-Subscribe."""
+class SensorBus:
     def __init__(self):
-        self._subscribers = defaultdict(list)
+        self._subs = defaultdict(list)
+        self._lock = threading.Lock()
 
     def subscribe(self, topic, callback):
-        self._subscribers[topic].append(callback)
+        with self._lock:
+            self._subs[topic].append(callback)
 
-    def publish(self, topic, message):
-        for cb in self._subscribers[topic]:
-            cb(message)
+    def publish(self, topic, nachricht):
+        with self._lock:
+            callbacks = list(self._subs[topic])
+        for cb in callbacks:
+            cb(nachricht)
 
-# Bus-Instanz (geteilt zwischen allen)
-bus = MessageBus()
+bus = SensorBus()
 
-# Subscriber-Callbacks
+# ── Subscriber ───────────────────────────────────────────────
 def navigation_callback(msg):
-    abstand = msg['abstand']
-    if abstand < 0.25:
-        print(f"  Navigation: STOPP (Abstand: {abstand} m)")
+    r, l = msg['rechts'], msg['links']
+    minimum = min(r, l)
+    if minimum < 25:
+        print(f"  NAV: STOPP   (min={minimum} cm)")
+    elif minimum < 50:
+        print(f"  NAV: LANGSAM (min={minimum} cm)")
+    else:
+        print(f"  NAV: FREI    ({r}/{l} cm)")
 
-def anzeige_callback(msg):
-    print(f"  Anzeige: Abstand = {msg['abstand']:.2f} m")
+def logger_callback(msg):
+    import time
+    ts = time.strftime("%H:%M:%S")
+    with open('stufe2_ros2/logs/sensor.csv', 'a') as f:
+        f.write(f"{ts},{msg['rechts']},{msg['links']}\n")
 
-# Registrieren
 bus.subscribe('/sensor/abstand', navigation_callback)
-bus.subscribe('/sensor/abstand', anzeige_callback)
+bus.subscribe('/sensor/abstand', logger_callback)
 
-# Publisher (Sensor) in eigenem Thread
-def sensor_publisher():
-    while True:
-        wert = round(random.uniform(0.1, 2.0), 2)
-        bus.publish('/sensor/abstand', {'abstand': wert, 'zeit': time.time()})
-        time.sleep(1.0)
-
-t = threading.Thread(target=sensor_publisher, daemon=True)
-t.start()
-time.sleep(5)
+# ── Publisher ────────────────────────────────────────────────
+def veroeffentliche(rechts_cm, links_cm):
+    bus.publish('/sensor/abstand', {
+        'rechts': rechts_cm,
+        'links':  links_cm,
+    })
 \end{lstlisting}
 
+\begin{projektBox}
+\textbf{Heute:} Pub-Sub-Bus für Sensordaten. Navigation
+und Logger subscriben unabhängig voneinander.\\
+\textbf{Konzept:} Identisch zu ROS2-Topics.
+In Band~2 wird \texttt{SensorBus} durch echte
+\texttt{rclpy}-Publisher ersetzt.
+\end{projektBox}
+
 \begin{merksatzBox}
-Publisher kennen ihre Subscriber nicht. Subscriber kennen ihren
-Publisher nicht. Beide kennen nur den Topic-Namen. Diese
-\textit{lose Kopplung} macht das System flexibel -- neue Subscriber
-können jederzeit hinzukommen, ohne Publisher zu ändern.
+Topic-Namen beginnen mit \texttt{/} und beschreiben den Inhalt,
+nicht den Sender: \texttt{/sensor/abstand}, nicht
+\texttt{/bridge\_zu\_navigation}. Publisher kennen ihre
+Subscriber nicht -- und das ist Absicht.
 \end{merksatzBox}
 
 \begin{robotikBox}
-Dieser Code ist strukturell identisch mit ROS2:
+Dieser Bus wird in Band~2 zu:
 \begin{lstlisting}[style=python]
-# ROS2-Equivalent:
-self.publisher = self.create_publisher(Float32, '/sensor/abstand', 10)
-self.subscription = self.create_subscription(
-    Float32, '/sensor/abstand', self.navigation_callback, 10)
+self.publisher = self.create_publisher(
+    Range, '/sensor/abstand', 10)
 \end{lstlisting}
-Das Konzept -- Publish-Subscribe über benannte Topics --
-ist exakt dasselbe. ROS2 fügt Netzwerkfähigkeit,
-Typsicherheit und Discovery hinzu.
+\texttt{Range} ist der ROS2-Standardtyp für Abstandssensoren.
+Der Rest des Codes bleibt fast identisch.
 \end{robotikBox}
