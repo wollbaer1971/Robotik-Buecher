@@ -1,0 +1,85 @@
+\chapter{Anhang A: Befehlsübersicht}
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Befehl} & \textbf{Bedeutung} \\
+\midrule
+\texttt{pwd}        & Aktuelles Verzeichnis anzeigen \\
+\texttt{ls}         & Dateien und Ordner anzeigen \\
+\texttt{ls -la}     & Mit Berechtigungen und versteckten Dateien \\
+\texttt{cd}         & Verzeichnis wechseln \\
+\texttt{mkdir}      & Verzeichnis erstellen \\
+\texttt{touch}      & Datei erstellen \\
+\texttt{cp}         & Datei oder Ordner kopieren \\
+\texttt{mv}         & Datei oder Ordner verschieben / umbenennen \\
+\texttt{rm}         & Datei löschen \\
+\texttt{rm -r}      & Verzeichnis rekursiv löschen \\
+\texttt{cat}        & Dateiinhalt ausgeben \\
+\texttt{less}       & Datei seitenweise anzeigen \\
+\texttt{grep}       & Text in Dateien suchen \\
+\texttt{ps aux}     & Alle laufenden Prozesse anzeigen \\
+\texttt{top / htop} & Prozesse interaktiv beobachten \\
+\texttt{kill}       & Prozess beenden \\
+\texttt{chmod}      & Dateiberechtigungen ändern \\
+\texttt{sudo}       & Befehl mit Root-Rechten ausführen \\
+\texttt{apt install}& Paket installieren (Ubuntu/Debian) \\
+\midrule
+\texttt{git init}   & Git-Repository initialisieren \\
+\texttt{git status} & Zustand des Repositories anzeigen \\
+\texttt{git add}    & Dateien zur Versionierung vormerken \\
+\texttt{git commit} & Änderungen festhalten \\
+\texttt{git log}    & Commit-Historie anzeigen \\
+\texttt{git diff}   & Änderungen anzeigen \\
+\texttt{git branch} & Branches anzeigen / erstellen \\
+\texttt{git merge}  & Branch zusammenführen \\
+\midrule
+\texttt{docker ps}           & Laufende Container anzeigen \\
+\texttt{docker images}       & Lokale Images anzeigen \\
+\texttt{docker run}          & Container starten \\
+\texttt{docker exec -it}     & In laufenden Container einsteigen \\
+\texttt{docker build}        & Image aus Dockerfile bauen \\
+\texttt{docker-compose up}   & Stack starten \\
+\texttt{docker-compose down} & Stack stoppen \\
+\bottomrule
+\end{tabularx}
+
+\chapter{Anhang B: Kapitel-Template}
+
+Dieses Template beschreibt die Struktur jedes Kapitels in Band 0.
+Es kann direkt als Ausgangspunkt für neue Kapitel verwendet werden.
+
+\begin{lstlisting}[style=text]
+\chapter{Wir wollen <konkrete Aufgabe>}
+
+\kapitelziel{ ... }
+\kapitelstruktur
+
+\section{Situation}
+...
+
+\begin{aufgabeBox} ... \end{aufgabeBox}
+
+\section{Erster Lösungsversuch}
+...
+
+\begin{problemBox} ... \end{problemBox}
+
+\section{Was wir dafür lernen müssen}
+\begin{wissenBox} ... \end{wissenBox}
+
+\section{Der pragmatische Weg}
+...
+
+\section{Schritt-für-Schritt-Lösung}
+\begin{loesungBox} ... \end{loesungBox}
+
+\section{Ergebnis prüfen}
+...
+
+\begin{merksatzBox} ... \end{merksatzBox}
+\begin{fehlerBox} ... \end{fehlerBox}
+\begin{uebungBox} ... \end{uebungBox}
+\begin{quizBox} ... \end{quizBox}
+\begin{haubeBox} ... \end{haubeBox}
+\begin{robotikBox} ... \end{robotikBox}
+\end{lstlisting}
