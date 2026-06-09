@@ -1,0 +1,104 @@
+% ============================================================
+% shared/preamble.tex
+% Zentrale Konfiguration für alle Bände der Buchreihe
+% "Python für Robotik und ROS2"
+% ============================================================
+% Einbinden: \input{../shared/preamble} in band*/main.tex
+% ============================================================
+
+% ── Sprache & Schrift ────────────────────────────────────────
+\usepackage[ngerman]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% ── Layout ──────────────────────────────────────────────────
+\usepackage{geometry}
+\geometry{left=28mm,right=22mm,top=25mm,bottom=30mm}
+\usepackage{scrlayer-scrpage}
+\KOMAoptions{headsepline=true}
+\pagestyle{scrheadings}
+\clearpairofpagestyles
+\lehead{\leftmark}
+\rohead{\BuchReihe}   % wird in band*/main.tex gesetzt
+\cfoot{\thepage}
+
+% ── Pakete ──────────────────────────────────────────────────
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable,listings}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{textcomp}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+
+\hypersetup{colorlinks=true,linkcolor=blue!60!black,urlcolor=teal}
+
+% ── Farben ──────────────────────────────────────────────────
+\definecolor{MerksatzFarbe}{HTML}{DDEEFF}
+\definecolor{UebungFarbe}{HTML}{FFF3CC}
+\definecolor{PraxisFarbe}{HTML}{E8F5E9}
+\definecolor{TippFarbe}{HTML}{FFF8E1}
+\definecolor{RosFarbe}{HTML}{FCE4EC}
+\definecolor{AnalogieFarbe}{HTML}{EDE7F6}
+\definecolor{LoesungFarbe}{HTML}{F3E5F5}
+\definecolor{CodeHintergrund}{HTML}{F8F8F8}
+
+% ── Python-Code ─────────────────────────────────────────────
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    backgroundcolor=\color{CodeHintergrund},
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    stringstyle=\color{teal!80!black},
+    commentstyle=\color{gray!70!black}\itshape,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{gray!40},
+    tabsize=4,
+    extendedchars=true,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=8pt
+}
+\lstset{
+    style=pythonstyle,
+    literate=
+        {ä}{{\"a}}1 {ö}{{\"o}}1 {ü}{{\"u}}1
+        {Ä}{{\"A}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1
+        {ß}{{\ss}}1
+}
+
+% ── Didaktische Boxen ────────────────────────────────────────
+\newtcolorbox{merksatz}[1][]{enhanced,breakable,
+    colback=MerksatzFarbe,colframe=blue!60!black,
+    fonttitle=\bfseries,title=Merksatz,#1}
+
+\newtcolorbox{uebung}[1][]{enhanced,breakable,
+    colback=UebungFarbe,colframe=orange!80!black,
+    fonttitle=\bfseries,title=Übung,#1}
+
+\newtcolorbox{praxis}[1][]{enhanced,breakable,
+    colback=PraxisFarbe,colframe=green!60!black,
+    fonttitle=\bfseries,title=Praxisbezug Robotik,#1}
+
+\newtcolorbox{tipp}[1][]{enhanced,breakable,
+    colback=TippFarbe,colframe=orange!40!black,
+    fonttitle=\bfseries,title=Tipp,#1}
+
+\newtcolorbox{ros}[1][]{enhanced,breakable,
+    colback=RosFarbe,colframe=red!70!black,
+    fonttitle=\bfseries,title=ROS2-Verbindung,#1}
+
+\newtcolorbox{analogie}[1][]{enhanced,breakable,
+    colback=AnalogieFarbe,colframe=purple!60!black,
+    fonttitle=\bfseries,title=Analogie,#1}
+
+\newtcolorbox{loesung}[1][]{enhanced,breakable,
+    colback=LoesungFarbe,colframe=purple!60!black,
+    fonttitle=\bfseries,title=Lösung,#1}
