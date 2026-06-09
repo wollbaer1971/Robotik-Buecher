@@ -1,0 +1,96 @@
+% !TeX program = lualatex
+% ============================================================
+% Band 0: Die Robotik-Werkstatt
+% Linux, Docker und Entwicklungswerkzeuge für ROS2
+%
+% Compiler: LuaLaTeX (wegen fontspec)
+% In Overleaf: Menu → Compiler → LuaLaTeX
+%              Menu → Main document → band0/main.tex
+% ============================================================
+
+\documentclass[
+  11pt, a4paper, oneside,
+  parskip=half,
+  headings=normal,
+  bibliography=totoc,
+  listof=totoc
+]{scrbook}
+
+% ── LuaLaTeX-spezifische Pakete ──────────────────────────────
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{microtype}
+\usepackage{hyphenat}
+\usepackage{tocbasic}
+
+% ── Layout ───────────────────────────────────────────────────
+\usepackage[
+  left=25mm, right=25mm, top=24mm, bottom=28mm,
+  headheight=16pt
+]{geometry}
+\usepackage{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{\leftmark}
+\ohead{\pagemark}
+\pagestyle{scrheadings}
+
+% ── Basis-Pakete ─────────────────────────────────────────────
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable,listings}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\setlist[itemize]{topsep=3pt,itemsep=2pt}
+\setlist[enumerate]{topsep=3pt,itemsep=2pt}
+
+% ── Werkstatt-Theme: Farben, Boxen, Listings ─────────────────
+\input{../shared/theme-werkstatt}
+
+% ── hyperref (nach Farbdefinitionen laden) ───────────────────
+\usepackage[
+  colorlinks=true,
+  linkcolor=WerkstattBlau,
+  urlcolor=WerkstattBlau,
+  citecolor=WerkstattBlau
+]{hyperref}
+
+% ── Band-Variablen (für shared/titelseite.tex kompatibel) ────
+\newcommand{\BuchReihe}{Robotik entwickeln lernen}
+\newcommand{\BandTitel}{Die Robotik-Werkstatt}
+\newcommand{\BandUntertitel}{Linux, Docker und Entwicklungswerkzeuge für ROS2}
+\newcommand{\BandNummer}{0}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Arbeitsfassung 2026}
+% \Werkreihe als Alias für ältere Makros
+\let\Werkreihe\BuchReihe
+
+% ── Dokument ─────────────────────────────────────────────────
+\begin{document}
+
+\frontmatter
+\input{chapters/titelseite}
+\input{chapters/frontmatter}
+\tableofcontents
+
+\mainmatter
+\input{chapters/teil1_idee}
+\input{chapters/teil2_linux}
+\input{chapters/teil3_textdateien}
+\input{chapters/teil4_entwicklung}
+\input{chapters/teil5_git}
+\input{chapters/teil6_docker}
+\input{chapters/teil7_netzwerk}
+\input{chapters/teil8_hardware}
+\input{chapters/teil9_ros2}
+
+\backmatter
+\input{chapters/anhang}
+
+\end{document}
