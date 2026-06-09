@@ -2,78 +2,565 @@
 \part{Linux praktisch verstehen}
 % ============================================================
 
+% ── Kapitel 3 ────────────────────────────────────────────────
 \chapter{Wir wollen eine Datei speichern und wiederfinden}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du lernst, wie Linux Dateien und Verzeichnisse organisiert und kannst
+das Dateisystem vom Terminal aus sicher navigieren.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du hast ein Python-Skript geschrieben und gespeichert. Jetzt öffnest
+du ein neues Terminal -- und weißt nicht mehr, wo die Datei liegt.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Navigiere im Dateisystem, finde deine Datei und lerne, Dateien
+gezielt zu speichern und wiederzufinden.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\section{Erster Lösungsversuch}
+Vielleicht kennst du Windows-Pfade wie \texttt{C:\textbackslash Users\textbackslash Wolfgang}.
+Unter Linux sieht das anders aus.
 
+\begin{problemBox}
+Linux kennt keine Laufwerksbuchstaben. Alles beginnt mit \texttt{/}.
+Wer das nicht weiß, versteht keine einzige Fehlermeldung.
+\end{problemBox}
+
+\begin{wissenBox}
+Wir brauchen: den Aufbau des Linux-Dateisystems, die wichtigsten
+Navigationsbefehle und das Konzept des aktuellen Verzeichnisses.
+\end{wissenBox}
+
+\section{Der pragmatische Weg}
+
+\begin{lstlisting}[style=bash]
+pwd                  # Wo bin ich gerade?
+ls                   # Was ist hier?
+ls -la               # Alles sehen, auch versteckte Dateien
+cd /home/wolfgang    # Absoluter Pfad
+cd ..                # Eine Ebene hoch
+cd ~                 # Direkt zum Home-Verzeichnis
+cd -                 # Zum letzten Verzeichnis zurueck
+\end{lstlisting}
+
+\begin{lstlisting}[style=text]
+Linux-Dateisystem (vereinfacht):
+/                    Root -- der Anfang von allem
+├── home/
+│   └── wolfgang/    Dein persoenliches Verzeichnis
+├── etc/             Systemkonfiguration
+├── var/             Logs und variable Daten
+├── usr/             Installierte Programme
+└── dev/             Geraetedateien (Sensoren, USB...)
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Schritt 1:} Prüfe, wo du bist.
+\begin{lstlisting}[style=bash]
+pwd
+# Ausgabe: /home/wolfgang
+\end{lstlisting}
+\textbf{Schritt 2:} Lege ein Projektverzeichnis an.
+\begin{lstlisting}[style=bash]
+mkdir -p ~/robotik/scripts
+cd ~/robotik/scripts
+\end{lstlisting}
+\textbf{Schritt 3:} Erstelle eine Datei und prüfe sie.
+\begin{lstlisting}[style=bash]
+touch sensor_test.py
+ls -la
+\end{lstlisting}
+\textbf{Schritt 4:} Dateien suchen.
+\begin{lstlisting}[style=bash]
+find ~ -name "sensor_test.py"
+find ~ -name "*.py" -newer /tmp
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+\texttt{pwd} zeigt, wo du bist. \texttt{cd} bewegt dich. \texttt{ls} zeigt,
+was da ist. Diese drei Befehle reichen für 80\% aller Navigation.
+Die Tilde \texttt{\textasciitilde} ist immer dein Home-Verzeichnis.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{Fehler:} \texttt{cd /home/wolfgang} auf einem fremden Rechner\\
+        \textbf{Besser:} Immer \texttt{cd \textasciitilde} -- funktioniert überall
+  \item \textbf{Fehler:} Leerzeichen im Verzeichnisnamen\\
+        \textbf{Folge:} \texttt{cd mein projekt} scheitert -- Anführungszeichen nötig
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\textbf{Aufgabe 1:} Navigiere in drei Schritten von \texttt{/} nach \texttt{/etc/default}.\\
+\textbf{Aufgabe 2:} Erstelle die Struktur \texttt{\textasciitilde/robotik/band1/uebungen/} mit einem Befehl.\\
+\textbf{Aufgabe 3:} Finde alle \texttt{.txt}-Dateien in \texttt{/etc}.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was gibt \texttt{pwd} aus?
+  \item Was bedeutet \texttt{..} in einem Pfad?
+  \item Wie lautet der absolute Pfad zum Home-Verzeichnis von Benutzer \texttt{ros}?
+\end{enumerate}
+\textbf{Antworten:} 1. Den absoluten Pfad des aktuellen Verzeichnisses.
+2. Das übergeordnete Verzeichnis. 3. \texttt{/home/ros}
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Inodes}: Jede Datei hat einen Inode -- eine eindeutige Nummer, die
+Metadaten speichert (Größe, Rechte, Zeitstempel). Der Dateiname ist nur
+ein Zeiger auf den Inode. Daher können mehrere Namen auf dieselbe Datei
+zeigen (\textit{Hardlinks}).
+
+Das Gerät \texttt{/dev/ttyUSB0} ist eine Datei. Das Netzwerkinterface
+\texttt{/proc/net/dev} ist eine Datei. Unter Linux ist \textit{alles} eine Datei.
+\end{haubeBox}
+
+\begin{robotikBox}
+ROS2-Konfigurationsdateien liegen in \texttt{\textasciitilde/.ros/}, Logs in
+\texttt{\textasciitilde/.ros/log/}. Wenn ein ROS2-Programm nicht startet,
+sucht man zuerst dort. Das Dateisystem ist die Grundlage jeder Fehlersuche.
+\end{robotikBox}
+
+% ── Kapitel 4 ────────────────────────────────────────────────
 \chapter{Wir wollen ein Programm starten}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst Programme aus dem Terminal starten, Pfade verstehen und
+Skripte ausführbar machen.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du hast ein Python-Skript \texttt{roboter.py} gespeichert. Jetzt willst du
+es starten -- aber \texttt{roboter.py} funktioniert nicht.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Starte dein Python-Skript aus dem Terminal und verstehe, warum
+\texttt{roboter.py} allein nicht ausreicht.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Das Terminal sucht Programme nur in bestimmten Verzeichnissen (\texttt{PATH}).
+Ein Skript im aktuellen Verzeichnis wird nicht automatisch gefunden.
+\end{problemBox}
 
+\begin{wissenBox}
+Wir brauchen: den PATH, den Shebang, Ausführungsrechte und den
+Unterschied zwischen \texttt{python3 skript.py} und \texttt{./skript.py}.
+\end{wissenBox}
+
+\section{Der pragmatische Weg}
+
+\begin{lstlisting}[style=bash]
+# Methode 1: Interpreter direkt angeben (empfohlen)
+python3 roboter.py
+
+# Methode 2: Als ausführbare Datei (braucht Shebang + chmod)
+chmod +x roboter.py
+./roboter.py
+
+# Wo sucht das Terminal nach Programmen?
+echo $PATH
+which python3
+\end{lstlisting}
+
+\begin{lstlisting}[style=python]
+#!/usr/bin/env python3
+# Erste Zeile: Shebang -- sagt Linux: dieses Skript mit python3 ausfuehren
+print("Roboter gestartet")
+\end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[style=bash]
+# Shebang hinzufuegen (erste Zeile in roboter.py)
+# Dann ausfuehrbar machen:
+chmod +x roboter.py
+
+# Starten -- Punkt-Slash sagt: "im aktuellen Verzeichnis suchen"
+./roboter.py
+
+# Oder ohne Shebang und chmod:
+python3 roboter.py
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+\texttt{python3 skript.py} -- immer. \texttt{./skript.py} -- nur wenn Shebang
+und \texttt{chmod +x} gesetzt. Das \texttt{./} ist kein Fehler, sondern Absicht:
+\enquote{Suche hier, nicht im PATH.}
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{Fehler:} \texttt{roboter.py: command not found}\\
+        \textbf{Grund:} Kein \texttt{./} und nicht im PATH
+  \item \textbf{Fehler:} \texttt{Permission denied}\\
+        \textbf{Grund:} \texttt{chmod +x} vergessen
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\textbf{Aufgabe:} Erstelle ein Skript \texttt{hallo.py} mit Shebang und
+\texttt{print("Hallo ROS2")}. Starte es auf beide Arten.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was speichert die Variable \texttt{\$PATH}?
+  \item Warum braucht \texttt{./skript.py} ein \texttt{./}?
+  \item Was macht \texttt{chmod +x datei}?
+\end{enumerate}
+\textbf{Antworten:} 1. Ordner, in denen Linux nach Programmen sucht.
+2. Weil aktuelles Verzeichnis nicht im PATH ist.
+3. Setzt das Ausführungsrecht.
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{PATH im Detail:} \texttt{echo \$PATH} zeigt z.\,B.
+\texttt{/usr/bin:/usr/local/bin:/home/ros/.local/bin}.
+Linux durchsucht diese Ordner von links nach rechts. Wer eigene
+Programme systemweit zugänglich machen will, kopiert sie nach
+\texttt{/usr/local/bin} oder erweitert den PATH in \texttt{.bashrc}.
+\end{haubeBox}
+
+\begin{robotikBox}
+ROS2-Befehle wie \texttt{ros2 run} funktionieren nur, wenn ROS2 im
+PATH steht. Das geschieht durch:
+\begin{lstlisting}[style=bash]
+source /opt/ros/jazzy/setup.bash
+\end{lstlisting}
+Dieser Befehl fügt ROS2-Verzeichnisse zum PATH hinzu. In \texttt{.bashrc}
+eingetragen, passiert das automatisch bei jedem Terminal-Start.
+\end{robotikBox}
+
+% ── Kapitel 5 ────────────────────────────────────────────────
 \chapter{Wir wollen Dateien erstellen, kopieren, verschieben und löschen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst Dateien und Verzeichnisse mit Terminal-Befehlen verwalten
+und kennst die wichtigsten Fallstricke beim Löschen.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du willst eine Konfigurationsdatei sichern, bevor du sie änderst.
+Außerdem müssen alte Logdateien gelöscht werden.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Lege Kopien an, verschiebe Dateien in die richtige Struktur und
+lösche gezielt -- ohne Datenverlust.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+\texttt{rm} löscht sofort und endgültig. Es gibt keinen Papierkorb
+im Terminal.
+\end{problemBox}
 
+\section{Der pragmatische Weg}
+
+\begin{lstlisting}[style=bash]
+# Erstellen
+touch neue_datei.txt          # leere Datei
+mkdir -p pfad/zu/ordner       # Ordner anlegen (p: auch Eltern)
+
+# Kopieren
+cp datei.txt backup.txt       # Datei kopieren
+cp -r ordner/ ordner_backup/  # Ordner rekursiv kopieren
+
+# Verschieben / Umbenennen
+mv datei.txt neuer_name.txt   # Umbenennen
+mv datei.txt ../anderer/pfad/ # Verschieben
+
+# Löschen
+rm datei.txt                  # Datei löschen
+rm -r ordner/                 # Ordner mit Inhalt löschen
+rm -i datei.txt               # Mit Rueckfrage (-i = interactive)
+
+# Wildcards
+cp *.py backup/               # Alle Python-Dateien kopieren
+rm log_2024*.txt              # Alle alten Logs loeschen
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Backup vor Änderung:}
+\begin{lstlisting}[style=bash]
+cp config.yaml config.yaml.bak
+# Jetzt sicher bearbeiten
+nano config.yaml
+# Falls etwas schiefläuft:
+cp config.yaml.bak config.yaml
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+Vor jedem \texttt{rm -r} einmal \texttt{ls} -- um sicher zu sein, was weg soll.
+Ein \texttt{rm -rf /} löscht das gesamte System ohne Rückfrage. Linux
+vertraut dir.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{cp ordner ziel} statt \texttt{cp -r}: kopiert nur den Ordner, nicht den Inhalt
+  \item \textbf{rm -rf \textasciitilde/}:  löscht dein komplettes Home-Verzeichnis
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+Erstelle folgende Struktur komplett mit Terminal-Befehlen:
+\begin{lstlisting}[style=text]
+~/robotik/
+├── band1/
+│   ├── uebungen/
+│   └── loesungen/
+└── backup/
+\end{lstlisting}
+Kopiere dann alle Dateien aus \texttt{uebungen/} nach \texttt{backup/}.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was ist der Unterschied zwischen \texttt{mv} und \texttt{cp}?
+  \item Warum ist \texttt{rm -i} sicherer als \texttt{rm}?
+  \item Was macht \texttt{mkdir -p a/b/c}, wenn \texttt{a} nicht existiert?
+\end{enumerate}
+\textbf{Antworten:} 1. mv verschiebt/benennt um; cp lässt Original bestehen.
+2. Es fragt vor jedem Löschen nach. 3. Es erstellt alle drei Verzeichnisse.
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Hardlinks und Softlinks:} \texttt{ln datei link} erzeugt einen Hardlink --
+zwei Namen für dieselben Daten. \texttt{ln -s datei link} erzeugt einen
+Softlink (Symlink) -- ein Zeiger. ROS2 nutzt intensiv Symlinks, um
+mehrere Workspace-Versionen zu verwalten.
+\end{haubeBox}
+
+\begin{robotikBox}
+Rosbag-Dateien (\texttt{.db3}) können gigabytegross werden. Mit
+\texttt{find \textasciitilde/.ros/log -mtime +7 -delete} löscht man automatisch
+Logs, die älter als 7 Tage sind -- wichtig auf Robotern mit kleiner SSD.
+\end{robotikBox}
+
+% ── Kapitel 6 ────────────────────────────────────────────────
 \chapter{Wir wollen wissen, was auf dem Computer gerade läuft}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst laufende Prozesse anzeigen, identifizieren und beenden.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Ein ROS2-Node läuft noch im Hintergrund und blockiert einen Port.
+Du weißt nicht, wie du ihn findest und stoppst.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Finde alle laufenden Prozesse, identifiziere den störenden und
+beende ihn gezielt.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Programme laufen nicht immer im Vordergrund. Hintergrundprozesse
+sind unsichtbar -- bis man weiß, wo man schauen muss.
+\end{problemBox}
 
+\section{Der pragmatische Weg}
+
+\begin{lstlisting}[style=bash]
+ps aux                    # Alle Prozesse anzeigen
+ps aux | grep python3     # Nur Python-Prozesse
+
+top                       # Live-Übersicht (q zum Beenden)
+htop                      # Komfortabler (apt install htop)
+
+# Prozess beenden
+kill 1234                 # PID 1234 beenden (SIGTERM)
+kill -9 1234              # Sofort beenden (SIGKILL)
+killall python3           # Alle python3-Prozesse beenden
+
+# Prozesse im Hintergrund
+python3 sensor.py &       # Im Hintergrund starten
+jobs                      # Hintergrundprozesse anzeigen
+fg %1                     # Prozess 1 in Vordergrund holen
+\end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[style=bash]
+# 1. Prozess finden
+ps aux | grep ros2
+# Ausgabe: ros  12345  ... python3 /opt/ros/jazzy/bin/ros2 run ...
+
+# 2. PID merken (hier: 12345)
+# 3. Beenden
+kill 12345
+
+# Falls er nicht reagiert:
+kill -9 12345
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+Jeder Prozess hat eine eindeutige \textbf{PID} (Process ID). \texttt{kill}
+sendet ein Signal -- standardmäßig SIGTERM (bitte beende dich). SIGKILL
+(-9) ist der Notausschalter: sofortiger Abbruch ohne Aufräumen.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{kill ohne Rechte:} Fremde Prozesse kann nur root beenden.
+  \item \textbf{kill -9 zu früh:} Offene Dateien können korrupt werden.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+Starte \texttt{python3 -c "import time; time.sleep(100)"} im Hintergrund.
+Finde die PID und beende den Prozess.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was ist eine PID?
+  \item Was ist der Unterschied zwischen SIGTERM und SIGKILL?
+  \item Wie startet man ein Programm im Hintergrund?
+\end{enumerate}
+\textbf{Antworten:} 1. Process ID -- eindeutige Nummer eines laufenden Prozesses.
+2. SIGTERM bittet zum Beenden; SIGKILL erzwingt es sofort.
+3. Mit \texttt{\&} am Ende des Befehls.
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Prozess-Hierarchie:} Jeder Prozess hat einen Elternprozess.
+\texttt{pstree} zeigt diese Baumstruktur. Wenn ein Elternprozess stirbt,
+werden Kindprozesse oft zu \textit{Waisen} -- sie laufen weiter, bis
+sie beendet werden. In ROS2 übernimmt der \texttt{ros2 launch}-Prozess
+die Kontrolle über alle gestarteten Nodes.
+\end{haubeBox}
+
+\begin{robotikBox}
+\texttt{ros2 node list} zeigt alle aktiven ROS2-Nodes. \texttt{ros2 node kill
+/sensor\_node} beendet einen Node sauber. Bei hängendem System:
+\begin{lstlisting}[style=bash]
+pkill -f ros2
+\end{lstlisting}
+beendet alle Prozesse mit "ros2" im Befehlsnamen.
+\end{robotikBox}
+
+% ── Kapitel 7 ────────────────────────────────────────────────
 \chapter{Wir wollen Fehlermeldungen verstehen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst Linux-Fehlermeldungen lesen, einordnen und die häufigsten
+Probleme selbstständig lösen.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du tippst einen Befehl -- und bekommst eine rote Fehlermeldung.
+Was jetzt?
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Lerne, Fehlermeldungen zu lesen und systematisch zu beheben.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Fehlermeldungen sind präzise -- aber nur für jemanden, der das
+Vokabular kennt. Ohne Grundwissen wirken sie einschüchternd.
+\end{problemBox}
 
+\begin{wissenBox}
+Wir brauchen: Exit-Codes, die häufigsten Fehlertypen,
+\texttt{stderr} vs. \texttt{stdout} und Log-Dateien.
+\end{wissenBox}
+
+\section{Die häufigsten Fehlermeldungen}
+
+\begin{lstlisting}[style=bash]
+# "command not found"
+ros2 run my_robot start
+# Ursache: ros2 nicht im PATH oder Tippfehler
+# Loesung: source /opt/ros/jazzy/setup.bash
+
+# "Permission denied"
+./mein_skript.py
+# Ursache: Kein Ausfuehrungsrecht
+# Loesung: chmod +x mein_skript.py
+
+# "No such file or directory"
+cat /home/ros/config.yaml
+# Ursache: Datei existiert nicht oder falscher Pfad
+# Loesung: ls pruefen, Pfad korrigieren
+
+# Exit-Code pruefen
+python3 skript.py
+echo $?    # 0 = Erfolg, alles andere = Fehler
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Systematische Fehlersuche:}
+\begin{lstlisting}[style=bash]
+# 1. Fehlermeldung komplett lesen
+# 2. Letzten Exit-Code pruefen
+echo $?
+
+# 3. Stderr von Stdout trennen
+python3 skript.py 2>fehler.log
+cat fehler.log
+
+# 4. In Logs schauen
+journalctl -xe          # Systemlogs
+journalctl -f           # Live-Logs
+tail -f ~/.ros/log/...  # ROS2-Logs
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+Exit-Code 0 bedeutet Erfolg. Jeder andere Wert ist ein Fehlercode.
+\texttt{echo \$?} direkt nach einem Befehl zeigt seinen Exit-Code.
+Fehlermeldungen kommen meist auf \texttt{stderr} -- dem \enquote{Fehlerkanal}.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item Fehlermeldung zu schnell wegklicken, ohne sie zu lesen.
+  \item Nur die letzte Zeile lesen -- oft steht der echte Fehler weiter oben.
+  \item Bei Python: der \texttt{Traceback} zeigt die genaue Zeile.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\textbf{Aufgabe:} Provoziere absichtlich drei verschiedene Fehler:
+1. Datei, die nicht existiert, ausgeben.
+2. Programm ohne Ausführungsrecht starten.
+3. Python-Syntaxfehler. Lese und erkläre jede Fehlermeldung.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was bedeutet Exit-Code 0?
+  \item Wohin gehen Fehlermeldungen normalerweise?
+  \item Wie sehe ich den Exit-Code des letzten Befehls?
+\end{enumerate}
+\textbf{Antworten:} 1. Programm erfolgreich beendet.
+2. Auf stderr (Standardfehlerausgabe). 3. Mit \texttt{echo \$?}
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Streams:} Jeder Prozess hat drei Standard-Streams:
+\texttt{stdin} (Eingabe, 0), \texttt{stdout} (Ausgabe, 1), \texttt{stderr} (Fehler, 2).
+Umleitung: \texttt{>} für stdout, \texttt{2>} für stderr, \texttt{\&>} für beides.
+\begin{lstlisting}[style=bash]
+python3 skript.py > ausgabe.txt 2>&1
+\end{lstlisting}
+Leitet alles (stdout + stderr) in eine Datei.
+\end{haubeBox}
+
+\begin{robotikBox}
+ROS2-Nodes schreiben Fehler in strukturierte Log-Dateien unter
+\texttt{\textasciitilde/.ros/log/}. Mit \texttt{ros2 bag info bag\_datei} lassen
+sich auch aufgezeichnete Fehler rekonstruieren. Gute Fehlerkultur
+beginnt damit, Meldungen komplett zu lesen statt sie zu ignorieren.
+\end{robotikBox}
