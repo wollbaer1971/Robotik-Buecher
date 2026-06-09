@@ -1,0 +1,81 @@
+% ============================================================
+\chapter{Modul 13: Matplotlib -- Daten visualisieren}
+% ============================================================
+
+\section{Lektion 36: Diagramme erstellen}
+
+\begin{lstlisting}
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Simulierte Sensordaten
+zeit       = np.linspace(0, 10, 100)
+abstand    = 1.5 + 0.5*np.sin(zeit) + np.random.normal(0, 0.05, 100)
+akku       = 100 - zeit * 3.5
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+fig.suptitle("MobileRobot-1: Testfahrt-Auswertung", fontsize=14)
+
+# Abstandsverlauf
+ax1.plot(zeit, abstand, 'b-', linewidth=1.5, label="Abstand roh")
+ax1.axhline(y=0.25, color='r', linestyle='--', label="Gefahrenschwelle")
+ax1.fill_between(zeit, abstand, 0.25,
+                 where=(abstand < 0.25), alpha=0.3, color='red',
+                 label="Gefahrenbereich")
+ax1.set_ylabel("Abstand [m]")
+ax1.legend()
+ax1.grid(True, alpha=0.3)
+
+# Akku-Verlauf
+ax2.plot(zeit, akku, 'g-', linewidth=2)
+ax2.axhline(y=20, color='orange', linestyle='--', label="Warnschwelle")
+ax2.set_xlabel("Zeit [s]")
+ax2.set_ylabel("Akku [%]")
+ax2.legend()
+ax2.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig("testfahrt.pdf", dpi=150)
+plt.show()
+\end{lstlisting}
+
+\section{Lektion 37: Roboter-Trajektorie und Polar-Plot}
+
+\begin{lstlisting}
+# Trajektorie des Roboters
+theta_verlauf = np.linspace(0, 2*np.pi, 200)
+x_bahn = np.cumsum(np.cos(theta_verlauf)) * 0.05
+y_bahn = np.cumsum(np.sin(theta_verlauf)) * 0.05
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Fahrspur
+ax1.plot(x_bahn, y_bahn, 'b-', linewidth=1)
+ax1.plot(x_bahn[0], y_bahn[0], 'gs', ms=10, label="Start")
+ax1.plot(x_bahn[-1], y_bahn[-1], 'r*', ms=10, label="Ende")
+ax1.set_aspect('equal')
+ax1.legend()
+ax1.set_title("Roboter-Trajektorie")
+ax1.grid(True)
+
+# Laserscanner: Polar-Plot
+winkel = np.linspace(0, 2*np.pi, 360)
+distanzen = 1.5 + 0.8*np.sin(3*winkel) + np.random.uniform(0, 0.1, 360)
+
+ax2 = plt.subplot(1, 2, 2, projection='polar')
+ax2.plot(winkel, distanzen, 'r-', linewidth=0.8)
+ax2.fill(winkel, distanzen, alpha=0.2, color='red')
+ax2.set_title("Laserscanner (360 Grad)")
+
+plt.tight_layout()
+plt.savefig("roboter_visualisierung.pdf", dpi=150)
+plt.show()
+\end{lstlisting}
+
+\begin{praxis}
+Visualisierung ist in der Robotik kein Luxus -- es ist Debugging. Ein Polar-Plot des Laserscanners zeigt sofort, wo Hindernisse sind. Eine Trajektorie zeigt, ob der Roboter wirklich geradeaus fährt oder driftet.
+\end{praxis}
+
+\begin{uebung}[title=Projektaufgabe Modul 13: Vollständiges Dashboard]
+Erstelle ein 4-Panel-Dashboard für eine simulierte Testfahrt: Panel 1 -- Trajektorie (x/y), Panel 2 -- Abstandsverlauf über Zeit, Panel 3 -- Akkuverlauf, Panel 4 -- Geschwindigkeitsverteilung (Histogramm). Alle Panels mit Beschriftung, Legende und Grid.
+\end{uebung}
