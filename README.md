@@ -1,31 +1,43 @@
 # Robotik-Buecher
 
-Buchserie: **Python für Robotik und ROS2**
+Buchserie: **Robotik entwickeln lernen**
 
-| Band | Titel | Status |
-|------|-------|--------|
-| Band 1 | Grundlagen bis ROS2-Einstieg | ✅ in Arbeit |
-| Band 2 | ROS2 vertieft: Navigation, Sensorfusion, Docker | 🔲 geplant |
-| Band 3 | Embedded AI: OpenCV, YOLO, Edge-Deployment | 🔲 geplant |
+| Band | Titel | Status | Compiler |
+|------|-------|--------|----------|
+| Band 0 | Die Robotik-Werkstatt -- Linux, Docker, Entwicklungswerkzeuge | ✅ in Arbeit | LuaLaTeX |
+| Band 1 | Python für Robotik und ROS2 -- Grundlagen bis ROS2-Einstieg | ✅ in Arbeit | pdfLaTeX |
+| Band 2 | ROS2 vertieft: Navigation, Sensorfusion, Docker | 🔲 geplant | pdfLaTeX |
+| Band 3 | Embedded AI: OpenCV, YOLO, Edge-Deployment | 🔲 geplant | pdfLaTeX |
 
 ## Struktur
 
 ```
 Robotik-Buecher/
-├── shared/          ← zentrale Konfiguration (gilt für alle Bände)
-│   ├── preamble.tex
-│   └── titelseite.tex
-├── band1/
-│   ├── main.tex     ← \input{../shared/preamble}
+├── shared/
+│   ├── preamble.tex          ← Basis für pdfLaTeX-Bände (Band 1–3)
+│   ├── theme-werkstatt.tex   ← Werkstatt-Theme für Band 0
+│   └── titelseite.tex        ← Titelseiten-Template (Band 1–3)
+├── band0/
+│   ├── main.tex              ← LuaLaTeX, \input{../shared/theme-werkstatt}
 │   └── chapters/
-├── band2/
-└── band3/
+├── band1/
+│   ├── main.tex              ← pdfLaTeX, \input{../shared/preamble}
+│   └── chapters/
+├── band2/                    ← Platzhalter
+└── band3/                    ← Platzhalter
 ```
 
 ## Overleaf-Workflow
 
-1. GitHub Sync → dieses Repo
-2. Menu → Main document → `band1/main.tex` für Band 1
-3. Menu → Main document → `band2/main.tex` für Band 2
+1. GitHub Sync → dieses Repo als ein Overleaf-Projekt
+2. `Menu → Main document` wechseln je nach Band:
+   - Band 0: `band0/main.tex` → **Compiler: LuaLaTeX**
+   - Band 1: `band1/main.tex` → **Compiler: pdfLaTeX**
+3. Eine Änderung in `shared/theme-werkstatt.tex` wirkt sofort auf alle Werkstatt-Bände.
+4. Eine Änderung in `shared/preamble.tex` wirkt sofort auf Band 1–3.
 
-**Ein Repo, ein Overleaf-Projekt, alle Bände.**
+## Didaktische Struktur
+
+**Band 0 (Werkstatt-Serie):** Problem → Wissenslücke → Lösung → Transfer zu Robotik/ROS2
+
+**Band 1 (Python-Serie):** Lernziele → Analogie → Theorie → Praxis → Übung → ROS2-Verbindung
