@@ -1,0 +1,36 @@
+% ============================================================
+% shared/titelseite.tex
+% Einheitliche Titelseite für alle Bände
+% Variablen werden in band*/main.tex gesetzt:
+%   \BandTitel, \BandUntertitel, \BandNummer, \BandAutor
+% ============================================================
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    {\small\color{gray}\BuchReihe\par}
+    \vspace{0.5cm}
+    \rule{0.7\textwidth}{0.5pt}
+    \vspace{1cm}
+
+    {\fontsize{28}{34}\selectfont\bfseries \BandTitel\par}
+    \vspace{0.8cm}
+    {\Large \BandUntertitel\par}
+    \vspace{1.5cm}
+
+    \begin{tcolorbox}[
+        enhanced, width=0.5\textwidth,
+        colback=blue!10!white, colframe=blue!60!black,
+        halign=center, fontupper=\Large\bfseries
+    ]
+        Band \BandNummer
+    \end{tcolorbox}
+
+    \vfill
+    \rule{0.4\textwidth}{0.5pt}
+    \vspace{0.5cm}
+
+    {\large \BandAutor\par}
+    {\small Gewerbliche Schule Backnang\par}
+    \vspace{0.3cm}
+    {\small \BandVersion\par}
+\end{titlepage}
