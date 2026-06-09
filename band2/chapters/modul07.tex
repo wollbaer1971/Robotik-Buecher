@@ -1,0 +1,79 @@
+% ============================================================
+\chapter{Modul 7: Dateien und Daten}
+% ============================================================
+
+\section{Lektion 20: Dateien lesen}
+
+\begin{lstlisting}
+import json, csv
+
+# --- JSON-Konfiguration lesen ---
+def lade_config(pfad="roboter.json"):
+    with open(pfad, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+# Beispiel-JSON-Datei (roboter.json):
+# {"name": "MobileRobot-1", "max_v": 0.5, "min_abstand": 0.2}
+
+# --- CSV-Sensorlog lesen ---
+def lade_sensorlog(pfad="log.csv"):
+    messwerte = []
+    with open(pfad, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for zeile in reader:
+            messwerte.append({
+                "zeit":    float(zeile["zeit_s"]),
+                "abstand": float(zeile["abstand_m"]),
+                "akku":    int(zeile["akku_prozent"])
+            })
+    return messwerte
+
+# Textdatei lesen
+with open("wegpunkte.txt", "r") as f:
+    for zeile in f:
+        x, y = zeile.strip().split(",")
+        print(f"Wegpunkt: ({x}, {y})")
+\end{lstlisting}
+
+\begin{merksatz}
+\texttt{with open(...) as f:} ist der sichere Weg. Die Datei wird automatisch geschlossen -- auch wenn ein Fehler auftritt. Ohne \texttt{with}: Datei bleibt offen, Datenverlust möglich.
+\end{merksatz}
+
+\section{Lektion 21: Dateien schreiben -- Sensorlogs}
+
+\begin{lstlisting}
+import csv, json, time
+
+# --- CSV-Sensorlog schreiben ---
+def starte_log(pfad="sensor_log.csv"):
+    f = open(pfad, "w", newline="", encoding="utf-8")
+    writer = csv.DictWriter(f,
+        fieldnames=["zeit_s", "abstand_m", "akku_prozent", "modus"])
+    writer.writeheader()
+    return f, writer
+
+def schreibe_messung(writer, abstand, akku, modus):
+    writer.writerow({
+        "zeit_s":       round(time.time(), 3),
+        "abstand_m":    abstand,
+        "akku_prozent": akku,
+        "modus":        modus
+    })
+
+# --- JSON-Konfiguration schreiben ---
+def speichere_config(config, pfad="config.json"):
+    with open(pfad, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    print(f"Konfiguration gespeichert: {pfad}")
+
+konfig = {"name": "MobileRobot-1", "max_v": 0.5, "min_abstand": 0.20}
+speichere_config(konfig)
+\end{lstlisting}
+
+\begin{praxis}
+Robotersysteme loggen immer Daten: Sensorwerte, Positionen, Fehlermeldungen. Diese Logs werden später zur Analyse und Fehlersuche verwendet. CSV ist das universelle Format -- jede Tabellenkalkulation kann es öffnen.
+\end{praxis}
+
+\begin{uebung}[title=Projektaufgabe Modul 7: Datenlogger]
+Schreibe einen vollständigen Datenlogger: Simuliere 20 Messzyklen, schreibe jeden Zyklus in eine CSV-Datei (Zeit, Abstand, Akku, X-Position, Y-Position). Danach: Datei lesen, Minimum/Maximum/Durchschnitt berechnen, Zusammenfassung ausgeben.
+\end{uebung}
