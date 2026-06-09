@@ -1,0 +1,278 @@
+% ============================================================
+\part{Die Idee der Robotik-Werkstatt}
+% ============================================================
+
+\chapter{Wir wollen einen Roboter programmieren -- aber womit eigentlich?}
+
+\kapitelziel{
+Nach diesem Kapitel verstehst du, warum Robotikentwicklung nicht nur aus
+Programmcode besteht. Du lernst die wichtigsten Werkzeuge kennen, die später
+immer wieder auftauchen: Linux, Terminal, Editor, Git, Docker,
+Programmiersprachen und ROS2.
+}
+
+\section{Situation}
+
+Stell dir vor, du möchtest einen mobilen Roboter entwickeln. Er soll Hindernisse
+erkennen, Motoren ansteuern, Sensordaten auswerten und eine Karte seiner
+Umgebung erstellen.
+
+Die naheliegende Frage lautet:
+
+\begin{quote}
+Welche Programmiersprache brauche ich dafür?
+\end{quote}
+
+Diese Frage ist verständlich, aber zu eng. Ein Roboter entsteht nicht nur durch
+eine Programmiersprache. Er entsteht durch ein Zusammenspiel vieler Werkzeuge.
+
+\begin{aufgabeBox}
+Wir wollen herausfinden, welche technische Grundausstattung wir brauchen,
+um später Roboter mit ROS2 entwickeln zu können.
+\end{aufgabeBox}
+
+\section{Erster Lösungsversuch}
+
+Man könnte sagen:
+
+\begin{quote}
+Ich installiere einfach Python und schreibe ein Programm.
+\end{quote}
+
+Für ein erstes kleines Programm reicht das. Für Robotik reicht es nicht.
+
+Ein Roboterprojekt braucht meistens:
+\begin{itemize}
+  \item ein Betriebssystem,
+  \item einen Editor,
+  \item ein Terminal,
+  \item eine Programmiersprache,
+  \item eine Möglichkeit zur Versionsverwaltung,
+  \item eine reproduzierbare Entwicklungsumgebung,
+  \item Kommunikationsmechanismen zwischen Programmen,
+  \item später ein Robotik-Framework wie ROS2.
+\end{itemize}
+
+\begin{problemBox}
+Das eigentliche Problem ist nicht: \enquote{Wie schreibe ich eine einzelne Codezeile?}
+
+Das eigentliche Problem ist: \enquote{Wie baue ich eine stabile Arbeitsumgebung,
+in der Robotiksoftware zuverlässig entstehen kann?}
+\end{problemBox}
+
+\section{Was wir dafür lernen müssen}
+
+\begin{wissenBox}
+Für die Robotik-Werkstatt brauchen wir zunächst einen Überblick über:
+\begin{itemize}
+  \item Betriebssystem und Entwicklungsumgebung,
+  \item Terminal und Quellcode,
+  \item Versionsverwaltung (Git),
+  \item Container (Docker),
+  \item Robotik-Framework (ROS2).
+\end{itemize}
+\end{wissenBox}
+
+\section{Die Werkzeuge im Überblick}
+
+\begin{lstlisting}[style=text]
+Robotik-Werkstatt
+├── Computer
+├── Linux
+├── Terminal
+├── VS Code
+├── Git
+├── Docker
+├── Python
+├── C++
+└── später ROS2
+\end{lstlisting}
+
+\subsection{Linux}
+Linux ist das Betriebssystem, auf dem sehr viele Robotiksysteme laufen. Es ist
+stabil, gut automatisierbar und in der technischen Entwicklung weit verbreitet.
+
+\subsection{Terminal}
+Das Terminal ist die direkte Texteingabe für den Computer. Man startet Programme,
+ruft Befehle auf, prüft Dateien und automatisiert Abläufe.
+
+\subsection{VS Code}
+Visual Studio Code ist Editor und Entwicklungsumgebung. Dort schreiben wir
+Code, öffnen Projektordner, nutzen das Terminal und verwalten Dateien.
+
+\subsection{Git}
+Git merkt sich Entwicklungsstände. Wenn etwas kaputtgeht, kann man Änderungen
+nachvollziehen oder zurückspringen.
+
+\subsection{Docker}
+Docker macht Entwicklungsumgebungen reproduzierbar. Was auf einem Rechner
+läuft, soll auch auf einem anderen laufen.
+
+\subsection{Python und C++}
+Python ist einfach zu lernen und in ROS2 sehr gut nutzbar. C++ ist in der
+professionellen Robotik wichtig für Geschwindigkeit und hardwarenahe Entwicklung.
+
+\subsection{ROS2}
+ROS2 ist kein Ersatz für Python oder C++. ROS2 ist ein Framework, mit dem
+viele Robotikprogramme miteinander kommunizieren können.
+
+\section{Konkrete Lösung}
+
+\begin{loesungBox}
+Für diese Lernreihe verwenden wir folgende Grundstruktur:
+\begin{enumerate}
+  \item Band 0: Linux, Docker und Entwicklungswerkzeuge.
+  \item Band 1: Python für Robotik.
+  \item Band 2: ROS2 mit Docker.
+  \item Band 3: C++ für Robotik.
+  \item Band 4: Mathematik für mobile Roboter.
+  \item Band 5: Mathematik für Manipulatoren.
+\end{enumerate}
+\end{loesungBox}
+
+\begin{merksatzBox}
+Wer Roboter entwickeln will, braucht zuerst eine Werkstatt. Diese Werkstatt
+besteht aus Betriebssystem, Terminal, Editor, Versionsverwaltung,
+Containertechnik und später ROS2.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{Fehler:} Direkt mit ROS2 starten, ohne Linux und Terminal zu verstehen.\\
+        \textbf{Folge:} Schon einfache Fehlermeldungen werden unverständlich.
+  \item \textbf{Fehler:} Alles lokal installieren, ohne Dokumentation.\\
+        \textbf{Folge:} Die Umgebung lässt sich kaum reproduzieren.
+  \item \textbf{Fehler:} Kein Git verwenden.\\
+        \textbf{Folge:} Änderungen sind nicht nachvollziehbar.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\textbf{Nachmachen:} Schreibe eine Liste der Werkzeuge, die du bereits installiert hast.
+
+\textbf{Verändern:} Ergänze zu jedem Werkzeug: \enquote{Dieses Werkzeug brauche ich, weil\ldots}
+
+\textbf{Anwenden:} Beschreibe mit eigenen Worten, warum ein Roboterprojekt
+nicht nur aus einem Python-Programm besteht.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Ist ROS2 eine Programmiersprache?
+  \item Wofür braucht man Git?
+  \item Warum ist Docker in der Robotik nützlich?
+  \item Warum reicht es nicht, nur Python zu lernen?
+\end{enumerate}
+\textbf{Lösungen:}
+\begin{enumerate}
+  \item Nein. ROS2 ist ein Robotik-Framework (Middleware).
+  \item Zur Versionsverwaltung und Nachvollziehbarkeit von Änderungen.
+  \item Für reproduzierbare Entwicklungsumgebungen.
+  \item Weil Robotik zusätzlich Betriebssysteme, Schnittstellen und Hardware erfordert.
+\end{enumerate}
+\end{quizBox}
+
+\begin{haubeBox}
+\subsection*{Unter der Haube: Robotikentwicklung als Schichtenmodell}
+
+\begin{lstlisting}[style=text]
+Anwendungsebene
+    ↓
+Robotik-Framework (ROS2)
+    ↓
+Programmiersprachen (Python / C++)
+    ↓
+Bibliotheken und Laufzeitumgebungen
+    ↓
+Betriebssystem (Linux)
+    ↓
+Treiber und Schnittstellen
+    ↓
+Hardware
+\end{lstlisting}
+
+Ein professioneller Entwickler fragt nicht nur: \enquote{Warum geht mein Code nicht?}
+Er fragt: \enquote{Auf welcher Ebene liegt das Problem?} -- denn der Fehler kann
+auf jeder dieser Schichten liegen.
+\end{haubeBox}
+
+\begin{robotikBox}
+Später in ROS2 werden einzelne Roboterfunktionen auf viele Programme verteilt.
+Eine Kamera-Node verarbeitet Bilder. Eine Lidar-Node liefert Abstandsdaten.
+Eine Motor-Node steuert Antriebe.
+
+Ohne Grundverständnis für Prozesse, Dateien, Netzwerke und Entwicklungsumgebungen
+wird ROS2 schnell unübersichtlich.
+\end{robotikBox}
+
+% ------------------------------------------------------------
+
+\chapter{Warum verwenden so viele Roboter Linux?}
+
+\kapitelziel{
+Nach diesem Kapitel verstehst du, warum Linux in der Robotik so verbreitet
+ist und warum wir uns in Band 0 nicht auf Windows als Hauptumgebung stützen.
+}
+
+\section{Situation}
+
+Du suchst im Internet nach ROS2, Raspberry Pi, Docker oder mobiler Robotik.
+Sehr schnell fällt auf: Viele Anleitungen verwenden Ubuntu oder eine andere
+Linux-Distribution.
+
+\begin{aufgabeBox}
+Wir wollen verstehen, warum Linux für Robotikentwicklung so wichtig ist.
+\end{aufgabeBox}
+
+\begin{problemBox}
+Wir müssen einordnen, ob Linux nur eine Vorliebe von Entwicklern ist
+oder ob es technische Gründe dafür gibt.
+\end{problemBox}
+
+\begin{wissenBox}
+Wir brauchen ein Grundverständnis für: Betriebssysteme, Open Source,
+Automatisierbarkeit, Embedded-Systeme, Server- und Netzwerktechnik,
+ROS2-Unterstützung.
+\end{wissenBox}
+
+\section{Konkrete Gründe für Linux in der Robotik}
+
+\begin{itemize}
+  \item Linux läuft auf kleinen Rechnern wie Raspberry Pi.
+  \item Linux läuft auf Industrie-PCs und Steuerungsrechnern.
+  \item Linux lässt sich gut automatisieren und skripten.
+  \item Linux bietet starken Netzwerkkommunikations-Stack.
+  \item Viele Robotikbibliotheken sind für Linux zuerst verfügbar.
+  \item ROS2 wird unter Ubuntu offiziell unterstützt.
+  \item Hardware-Geräte erscheinen als Dateien (\texttt{/dev/ttyUSB0}).
+\end{itemize}
+
+\begin{loesungBox}
+Für unsere Lernreihe gilt: Wir verwenden Linux, weil es der praktischste
+Einstieg in professionelle ROS2-Entwicklung ist. Windows kann als Hostsystem
+dienen -- über Docker Desktop oder WSL läuft dann eine Linux-Umgebung darin.
+\end{loesungBox}
+
+\begin{merksatzBox}
+Linux ist in der Robotik nicht deshalb wichtig, weil es exotisch ist, sondern
+weil es stabil, automatisierbar und technisch gut kontrollierbar ist.
+\end{merksatzBox}
+
+\begin{haubeBox}
+\subsection*{Unter der Haube: Linux als Schnittstelle zwischen Software und Hardware}
+
+Ein Betriebssystem verwaltet Ressourcen: Prozessorzeit, Arbeitsspeicher,
+Dateien, Benutzerrechte, Netzwerk, Hardwaregeräte.
+
+Für Robotik ist besonders wichtig, dass Linux viele Geräte als Dateien
+sichtbar macht. Ein serieller USB-Adapter erscheint als \texttt{/dev/ttyUSB0}.
+Ein Python-Programm kann dann über diese Gerätedatei mit einem Mikrocontroller
+kommunizieren -- ohne Treiber-DLLs, ohne COM-Port-Konfiguration.
+\end{haubeBox}
+
+\begin{robotikBox}
+Wenn später ein ROS2-Programm mit einem Lidar, einer Kamera oder einem
+Mikrocontroller spricht, läuft darunter oft ein Linux-Gerätetreiber. ROS2
+ist dann nur die obere Kommunikationsschicht. Darunter steht weiterhin das
+Betriebssystem.
+\end{robotikBox}
