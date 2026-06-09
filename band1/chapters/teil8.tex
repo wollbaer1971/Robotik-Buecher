@@ -308,3 +308,288 @@ Ein Arduino-seitiger ROS2-Serial-Bridge-Node
 Das Prinzip -- Python schickt Befehle, Arduino führt aus --
 bleibt exakt dasselbe.
 \end{robotikBox}
+
+% ── Kapitel: Zwei Gehirne für einen Roboter ──────────────────
+\chapter{Warum unser Roboter zwei Gehirne braucht}
+
+\kapitelziel{
+Du verstehst den Unterschied zwischen echtzeitfähigen und
+nicht-echtzeitfähigen Systemen, kannst erklären, warum Linux
+sicherheitskritische Aufgaben nicht allein übernehmen sollte,
+und begründest die Architektur des robotik-uno-q.
+}
+\kapitelstruktur
+
+\section{Situation}
+
+\texttt{differentialantrieb.ino} hat folgende Funktion:
+
+\begin{lstlisting}[style=text]
+// In differentialantrieb.ino:
+void kontaktISR() {
+    kontaktAusgeloest = true;   // wird in < 1 Mikrosekunde ausgefuehrt
+}
+
+attachInterrupt(digitalPinToInterrupt(D2), kontaktISR, FALLING);
+\end{lstlisting}
+
+Sobald der Kontaktsensor berührt wird, feuert dieser Interrupt --
+in wenigen Mikrosekunden, mitten in jeder anderen Operation.
+
+Warum läuft dieser Code auf dem Arduino, nicht auf dem Raspberry Pi?
+
+\begin{aufgabeBox}
+Verstehe, warum zeitkritische Sicherheitsfunktionen auf dem
+Mikrocontroller liegen müssen -- und was \enquote{Echtzeit}
+wirklich bedeutet.
+\end{aufgabeBox}
+
+\section{Das Missverständnis: Echtzeit = schnell}
+
+\enquote{Echtzeit} klingt nach sehr schnellem Computer.
+Das ist falsch.
+
+\begin{wissenBox}
+\textbf{Echtzeit bedeutet nicht schnell -- sondern vorhersagbar.}
+
+Ein echtzeitfähiges System garantiert, dass eine Reaktion
+\emph{innerhalb einer definierten maximalen Zeit} erfolgt.
+Diese Garantie gilt ausnahmslos -- also auch dann, wenn
+gleichzeitig andere Prozesse laufen.
+
+\begin{tabular}{lll}
+\toprule
+System & Reaktionszeit & Garantiert? \\
+\midrule
+Arduino (bare metal) & \textasciitilde 1--10 \textmu{}s & \textbf{Ja} \\
+FreeRTOS auf STM32   & \textasciitilde 10--100 \textmu{}s & Ja (konfigurierbar) \\
+Linux (Standard)     & 1--100 ms & \textbf{Nein} \\
+Linux RT-Patch       & \textasciitilde 100 \textmu{}s--1 ms & Ja (eingeschränkt) \\
+Python (GIL, GC)     & 1--200 ms & Nein \\
+\bottomrule
+\end{tabular}
+
+Für einen Sicherheitsstopp bei 0{,}5 m/s muss der Roboter in
+$< 250$\,ms reagieren, um nicht in ein Hindernis zu fahren.
+Das schafft Linux -- meistens. Beim Kontaktsensor reichen
+wenige Millisekunden Toleranz. \textbf{Meistens} ist nicht gut genug.
+\end{wissenBox}
+
+\section{Warum Linux nicht echtzeitfähig ist}
+
+\begin{haubeBox}
+\textbf{Der Linux-Scheduler und das GIL}
+
+Linux verwendet den \textit{Completely Fair Scheduler} (CFS).
+Er teilt CPU-Zeit \enquote{fair} zwischen allen Prozessen auf.
+Fair bedeutet: Jeder Prozess bekommt regelmäßig Rechenzeit --
+aber \emph{wann genau} ist nicht garantiert.
+
+Stell dir vor, Python ist gerade dabei, den Kontaktsensor
+auszuwerten. In diesem Moment entscheidet der Scheduler,
+dass ein anderer Prozess (Systemupdate, Netzwerkpaket,
+Logging-Daemon) drankommt. Python wartet. Der Roboter fährt
+ungebremst weiter.
+
+Zusätzlich hat Python den \textit{Global Interpreter Lock}
+(GIL): Nur ein Thread kann gleichzeitig Python-Code ausführen.
+Der \textit{Garbage Collector} pausiert alle Threads für
+1--50\,ms, um Speicher freizugeben.
+
+Für einen Webserver sind 50\,ms akzeptabel.
+Für einen Notbremssensor am Roboter können sie katastrophal sein.
+\end{haubeBox}
+
+\begin{haubeBox}
+\textbf{Was ist ein Echtzeit-Betriebssystem?}
+
+Ein \textit{Real-Time Operating System} (RTOS) löst dieses
+Problem durch einen \textit{präemptiven Prioritäts-Scheduler}:
+
+\begin{itemize}
+  \item Jeder Task hat eine Priorität.
+  \item Ein hochpriorisierter Task kann einen niedrigpriorisierten
+        \emph{sofort} unterbrechen -- nicht erst nach dem nächsten
+        Scheduling-Zyklus.
+  \item Die maximale Reaktionszeit (\textit{Latenz}) ist definiert
+        und garantiert.
+\end{itemize}
+
+Bekannte RTOS:
+\begin{itemize}
+  \item \textbf{FreeRTOS}: Open Source, auf STM32 (Arduino UNO Q),
+        ESP32, ARM Cortex -- sehr weit verbreitet.
+  \item \textbf{Zephyr}: Linux Foundation, industriell, ROS2-fähig.
+  \item \textbf{QNX}: POSIX-kompatibel, in Automobilen und Medizintechnik.
+  \item \textbf{VxWorks}: NASA Mars Rover, militärische Systeme.
+\end{itemize}
+
+Der Arduino UNO Q (STM32U585) \emph{kann} FreeRTOS ausführen.
+Im \texttt{robotik-uno-q}-Projekt läuft der Code aber als
+\emph{bare metal}: kein OS, direkter Zugriff auf Hardware,
+deterministisches Timing durch ISRs (Interrupt Service Routines).
+Für unseren Anwendungsfall ist das ausreichend und einfacher.
+\end{haubeBox}
+
+\section{Warum die kontaktISR so kurz ist}
+
+Schau dir den echten Code in \texttt{differentialantrieb.ino} an:
+
+\begin{lstlisting}[style=text]
+// ============================================================
+// INTERRUPT-SERVICE-ROUTINE
+// Wird bei fallender Flanke an D2 automatisch aufgerufen.
+// ISR muss kurz sein: nur Flag setzen, kein delay(), kein Serial.
+// ============================================================
+void kontaktISR() {
+    kontaktAusgeloest = true;
+}
+\end{lstlisting}
+
+Der Kommentar sagt es: \textbf{ISR muss kurz sein.}
+
+\begin{wissenBox}
+\textbf{Regeln für Interrupt Service Routines:}
+\begin{itemize}
+  \item Nur ein Flag setzen -- nie komplexe Logik.
+  \item Kein \texttt{delay()} -- blockiert den Interrupt-Controller.
+  \item Kein \texttt{Serial.println()} -- UART-Puffer ist nicht
+        interrupt-sicher.
+  \item Variable mit \texttt{volatile} deklarieren -- verhindert,
+        dass der Compiler die Variable wegoptimiert.
+\end{itemize}
+
+Die eigentliche Reaktion -- zurückfahren, drehen -- passiert in
+\texttt{ausfuehrenAusweichmanoever()} im normalen
+\texttt{loop()}, nicht in der ISR.
+Das ist korrekte Echtzeit-Programmierung.
+\end{wissenBox}
+
+\section{Die Aufgabenteilung beim robotik-uno-q}
+
+\begin{lstlisting}[style=text]
+ARDUINO UNO Q (Echtzeit, bare metal)        RASPBERRY PI (Linux, Python)
+────────────────────────────────────         ──────────────────────────────
+Sicherheitskritisch:                         Komplex, aber tolerant:
+  kontaktISR()                               sensor_bridge.py
+  < 10 us Reaktionszeit                      motor_bridge.py
+  garantiert                                 navigation_callback()
+                                             docker, yaml, logging
+
+PWM-Motorsteuerung:                          Konfiguration:
+  ENA/ENB mit 8-Bit-Aufloesung              sensor_config.yaml
+  50 Hz Periode, exakt                       git pull vor Start
+  kein Jitter erlaubt                        VS Code Remote
+
+Sensor-Rohdaten:                             Protokollverarbeitung:
+  HC-SR04 pulseIn()                          parse_zeile("R=87 cm  L=124 cm")
+  Timing in Mikrosekunden                    Publish auf SensorBus
+  direkt am Pin gemessen                     Logging in CSV-Datei
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Was würde passieren, wenn Linux alles macht?}
+
+Stell dir vor, der Kontaktsensor liegt direkt am Raspberry Pi --
+kein Arduino, Python-Skript überwacht den GPIO-Pin.
+
+\begin{enumerate}
+  \item Python liest den Pin: alles frei.
+  \item Linux-Scheduler unterbricht Python (10\,ms für Systemtask).
+  \item In diesen 10\,ms berührt der Roboter die Wand.
+  \item Python läuft wieder -- liest Kontakt -- stoppt.
+  \item Der Roboter hat die Wand bereits getroffen.
+\end{enumerate}
+
+Mit Arduino ISR:
+\begin{enumerate}
+  \item Berührung: fallende Flanke an D2.
+  \item Hardware-Interrupt feuert in $< 10\,\mu$s.
+  \item \texttt{kontaktISR()} setzt Flag.
+  \item Nächster \texttt{loop()}-Durchlauf: \texttt{stopp()} + Ausweichen.
+  \item Reaktionszeit: $< 1\,\text{ms}$ -- unabhängig von Linux.
+\end{enumerate}
+\end{loesungBox}
+
+\begin{projektBox}
+\textbf{Die Architektur-Begründung:}\\
+Arduino = Sicherheitsebene. Garantierte Reaktionszeiten.
+Kein OS, keine Unterbrechungen durch Scheduler.\\
+Linux = Intelligenzebene. Komplexe Logik, Kommunikation,
+Konfiguration, KI -- aber ohne Echtzeit-Garantie.\\
+\textbf{Diese Trennung ist kein Kompromiss -- sie ist das
+richtige Design.}
+\end{projektBox}
+
+\begin{merksatzBox}
+Echtzeit \(\neq\) schnell. Echtzeit \(=\) \textbf{vorhersagbar}.
+
+Ein System ist echtzeitfähig, wenn es eine maximale
+Reaktionszeit garantieren kann -- nicht nur im Durchschnitt,
+sondern \emph{immer}. Linux und Python sind für viele
+Aufgaben exzellent. Für Mikrosekunden-präzise
+Sicherheitsfunktionen ist ein Mikrocontroller die
+richtige Wahl.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{GPIO-Interrupt direkt auf Raspberry Pi für Sicherheitsfunktionen:}
+        Linux garantiert keine Latenz. Bei 0,5 m/s und 20\,ms
+        Verzögerung fährt der Roboter 1\,cm weiter -- in die Wand.
+  \item \textbf{delay() in ISR:} Blockiert alle anderen Interrupts.
+        Der Arduino reagiert auf gar nichts mehr.
+  \item \textbf{Non-volatile Flag in ISR:} Der Compiler optimiert
+        die Variable weg -- das Flag wird nie gesetzt.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\textbf{Analyse:} Schau dir \texttt{hinderniserkennung.ino} an.
+Läuft dort die Hinderniserkennung echtzeitsicher?
+Welche Funktion hat die höchste zeitliche Anforderung?
+Was würde passieren, wenn \texttt{BREMS\_ABSTAND\_CM} auf 200 gesetzt wird?
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was bedeutet \enquote{Echtzeit} in der Informatik?
+  \item Warum ist Python nicht für sicherheitskritische Steuerung geeignet?
+  \item Welche drei Dinge darf eine ISR nicht tun?
+  \item Was ist der Unterschied zwischen FreeRTOS und bare metal?
+\end{enumerate}
+\textbf{Antworten:}
+1.~Vorhersagbare, garantierte maximale Reaktionszeit.
+2.~GIL, Garbage Collector und Scheduler können Ausführung für
+10--200\,ms unterbrechen -- keine Garantie.
+3.~\texttt{delay()}, \texttt{Serial.print()}, komplexe Berechnungen.
+4.~FreeRTOS ist ein Mini-OS mit Scheduler und Tasks;
+bare metal läuft direkt ohne OS, deterministisch durch ISRs.
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Linux mit RT-Patch}
+
+Es gibt ein \textit{PREEMPT\_RT}-Patch für den Linux-Kernel,
+der die Scheduler-Latenzen drastisch reduziert -- auf
+unter 100\,\textmu{}s. Damit wird Linux \enquote{weich echtzeitfähig}.
+
+ROS2 mit PREEMPT\_RT läuft auf autonomen Fahrzeugen, in
+Industrierobotern von KUKA und in Medizingeräten.
+
+Für unseren Raspberry Pi ist das nicht nötig -- der Arduino
+übernimmt die zeitkritischen Aufgaben. Aber es ist gut zu
+wissen: Linux kann, wenn es sein muss.
+\end{haubeBox}
+
+\begin{robotikBox}
+ROS2 hat das Thema Echtzeit direkt adressiert:
+\textbf{micro-ROS} bringt einen schlanken ROS2-Client direkt
+auf Mikrocontroller (STM32, ESP32) -- mit FreeRTOS.
+Dann kann der Arduino seine Sensordaten direkt als ROS2-Topics
+publishen, ohne Serial-Brücke.
+
+Das ist die Architektur von morgen: kein getrenntes Protokoll,
+kein Parsing -- der Mikrocontroller ist ein vollwertiger ROS2-Node.
+In Band~3 richten wir micro-ROS auf dem Arduino UNO Q ein.
+\end{robotikBox}
