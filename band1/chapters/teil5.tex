@@ -5,211 +5,212 @@
 \chapter{Wir wollen einen Fehler rückgängig machen}
 
 \kapitelziel{
-Du kannst ein Git-Repository anlegen, Änderungen versionieren
-und frühere Stände wiederherstellen.
+Du verstehst die Git-History von robotik-uno-q, kannst
+neue Commits sinnvoll schreiben und Änderungen rückgängig machen.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du hast drei Stunden an deinem Sensor-Code gearbeitet -- und ihn
-dabei kaputt gemacht. Strg+Z reicht nicht mehr.
+
+\texttt{robotik-uno-q} ist bereits ein Git-Repository --
+du hast es von GitHub geklont. Es hat eine History.
+Du hast seitdem Dateien hinzugefügt: \texttt{sensor\_bridge.py},
+\texttt{sensor\_config.yaml}, \texttt{start\_roboter.sh}.
+
+Diese Änderungen sind noch nicht in Git.
+Wenn jetzt etwas schiefgeht -- die Festplatte stirbt,
+ein Update zerstört den Code -- ist alles weg.
 
 \begin{aufgabeBox}
-Lerne, Änderungen in Git nachzuverfolgen und bei Bedarf
-auf einen früheren Stand zurückzusetzen.
+Versioniere alle bisherigen Änderungen am Projekt sinnvoll,
+sodass du bei Bedarf auf jeden Stand zurückspringen kannst.
 \end{aufgabeBox}
 
-\begin{problemBox}
-Ohne Versionsverwaltung gibt es keinen Rückweg. Jede nicht
-gesicherte Änderung ist ein Risiko.
-\end{problemBox}
+\begin{haubeBox}
+\textbf{Warum so viele kleine Commits statt einem großen?}
 
-\section{Git-Grundbefehle}
+Stell dir vor, du hast drei Wochen Arbeit in einen einzigen
+Commit gepackt: \enquote{Projekt fertig.} Jetzt funktioniert
+etwas nicht mehr -- aber was? Du musst mühsam im Gedächtnis
+kramen, was du wann geändert hast.
+
+Mit kleinen Commits ist jede Änderung einzeln rückgängig
+zu machen. \texttt{git revert abc1234} macht genau diesen
+einen Commit rückgängig -- alle anderen bleiben.
+Das ist wie \enquote{Strg+Z} für einzelne Entscheidungen.
+\end{haubeBox}
+
+\section{Der pragmatische Weg}
 
 \begin{lstlisting}[style=bash]
-# Repository anlegen
-cd ~/robotik
-git init
-git config user.name "Wolfgang Becker"
-git config user.email "w.becker@schule.de"
+cd ~/robotik-uno-q
 
-# Ersten Commit erstellen
-git add .                       # Alle Dateien vormerken
-git commit -m "Erster Commit: Projektstruktur"
+# Was hat sich geaendert?
+git status
+git diff
 
 # Aenderungen versionieren
-nano src/sensoren.py             # Datei bearbeiten
-git status                      # Was hat sich geaendert?
-git diff                        # Was genau ist anders?
-git add src/sensoren.py
-git commit -m "Ultraschall-Sensor: Mittelwert-Filterung ergaenzt"
+git add stufe2_ros2/src/sensor_bridge.py
+git commit -m "feat(stufe2): sensor_bridge.py -- Grundstruktur"
 
-# Historie anzeigen
-git log                         # Alle Commits
-git log --oneline               # Kompakt
+git add stufe2_ros2/config/sensor_config.yaml
+git commit -m "feat(config): HC-SR04 Sensor-Konfiguration"
+
+git add scripts/start_roboter.sh
+git commit -m "feat(scripts): start_roboter.sh -- Stack-Startskript"
+
+# History anzeigen
+git log --oneline
 \end{lstlisting}
 
 \begin{loesungBox}
-\textbf{Zurück zum letzten funktionierenden Stand:}
+\textbf{Fehler rückgängig machen:}
 \begin{lstlisting}[style=bash]
-# Letzte nicht committeten Aenderungen verwerfen
-git checkout -- src/sensoren.py
+# Letzte Aenderungen in sensor_bridge.py verwerfen (vor Commit)
+git checkout -- stufe2_ros2/src/sensor_bridge.py
 
-# Auf bestimmten Commit zurueckgehen (Hash aus git log)
-git checkout abc1234 -- src/sensoren.py
-
-# Kompletten letzten Commit rueckgaengig machen (sicher)
+# Letzten Commit rueckgaengig (neuen Commit erstellt)
 git revert HEAD
+
+# Auf bestimmten Stand zurueckgehen (nur lesen, nicht zerstoeren)
+git show abc1234:stufe2_ros2/src/sensor_bridge.py > /tmp/alte_version.py
 \end{lstlisting}
 \end{loesungBox}
 
+\begin{projektBox}
+\textbf{Bisher:} Ungekoppelte Dateien.\\
+\textbf{Heute:} Saubere Git-History mit aussagekräftigen Commit-Nachrichten.\\
+\textbf{Nächstes Kapitel:} Sicher experimentieren mit Branches.
+\end{projektBox}
+
 \begin{merksatzBox}
-\textbf{Commit oft, commit früh.} Jeder Commit ist ein Sicherungspunkt.
-Gute Commit-Nachrichten sagen \textit{warum} -- nicht nur was.
-\enquote{Fix} ist eine schlechte Nachricht. \enquote{Ultraschall: Ausreißer bei
-< 5 cm ignoriert} ist eine gute.
+\textbf{Commit-Nachrichten-Format:} \texttt{typ(bereich): was wurde gemacht}
+
+\texttt{feat}: neues Feature ·
+\texttt{fix}: Bugfix ·
+\texttt{docs}: Dokumentation ·
+\texttt{refactor}: Umbau ohne neue Funktion
+
+\enquote{Fix} ist eine schlechte Nachricht.
+\enquote{fix(serial): Timeout bei langsamer Arduino-Antwort erhöht} ist eine gute.
 \end{merksatzBox}
 
-\begin{fehlerBox}
-\begin{itemize}
-  \item \textbf{git add -A} ohne nachzudenken: Temporäre Dateien und
-        Passwörter landen im Repository.
-  \item \textbf{.gitignore vergessen:} Logfiles und \texttt{\_\_pycache\_\_} im Repo.
-\end{itemize}
-\end{fehlerBox}
-
-\begin{uebungBox}
-Erstelle ein Repo, mache drei Commits mit jeweils einer Änderung.
-Mache den zweiten Commit mit \texttt{git revert} rückgängig ohne
-den dritten zu verlieren.
-\end{uebungBox}
-
-\begin{quizBox}
-\begin{enumerate}
-  \item Was speichert \texttt{git add}?
-  \item Was ist der Unterschied zwischen \texttt{git checkout} und \texttt{git revert}?
-  \item Welche Datei steuert, was Git ignoriert?
-\end{enumerate}
-\textbf{Antworten:} 1. Vorgemerkte Änderungen für den nächsten Commit (Staging Area).
-2. checkout setzt zurück (destruktiv), revert erstellt einen neuen Commit.
-3. \texttt{.gitignore}
-\end{quizBox}
-
 \begin{robotikBox}
-ROS2-Workspaces haben oft automatisch generierte Dateien
-(\texttt{install/}, \texttt{build/}, \texttt{log/}). Diese gehören nicht in
-Git -- sie entstehen beim Bauen neu. Die \texttt{.gitignore}:
-\begin{lstlisting}[style=text]
-build/
-install/
-log/
-*.db3
-\end{lstlisting}
+ROS2-Pakete auf GitHub folgen Conventional Commits.
+Wer sich jetzt angewöhnt sauber zu committen, kann
+später Pull Requests für offizielle ROS2-Pakete einreichen --
+das Format ist identisch.
 \end{robotikBox}
 
+% ── Kapitel 14 ────────────────────────────────────────────────
 \chapter{Wir wollen gefahrlos etwas ausprobieren}
 
 \kapitelziel{
-Du kannst Git-Branches erstellen und verstehst, wie parallele
-Entwicklungsstränge funktionieren.
+Du kannst Branches für neue Features nutzen und damit
+\texttt{stufe1\_mcu/} und \texttt{stufe2\_ros2/} parallel entwickeln.
 }
 \kapitelstruktur
 
 \section{Situation}
-Die aktuelle Version des Roboters funktioniert. Du willst eine neue
-Hindernisvermeidung ausprobieren -- ohne die funktionierende
-Version zu gefährden.
+
+\texttt{hinderniserkennung.ino} funktioniert. Jetzt willst
+du eine verbesserte Filterung ausprobieren -- Mittelwert
+über die letzten 5 Messungen statt Direktwert.
+Aber was, wenn die neue Version schlechter ist?
 
 \begin{aufgabeBox}
-Erstelle einen Branch, entwickle dort und merge zurück wenn fertig.
+Erstelle einen Branch für die verbesserte Hinderniserkennung
+und entwickle dort, ohne die funktionierende Version zu gefährden.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=bash]
-# Branch erstellen und wechseln
-git checkout -b feature/hinderniserkennung
+# Branch erstellen
+git checkout -b feature/ultraschall-mittelwertfilter
 
-# Entwickeln, testen, committen...
-nano src/navigation.py
-git add src/navigation.py
-git commit -m "Neue Hinderniserkennung: VFH-Algorithmus"
+# Aenderung vornehmen
+nano stufe1_mcu/hinderniserkennung/hinderniserkennung.ino
+# Mittelwert-Filterung einbauen
 
-# Zurueck zum Hauptzweig
+git add stufe1_mcu/hinderniserkennung/hinderniserkennung.ino
+git commit -m "feat(stufe1): Ultraschall -- gleitender Mittelwert (n=5)"
+
+# Testen -- funktioniert es besser?
+# Wenn ja: zurueck zu main und mergen
 git checkout main
+git merge feature/ultraschall-mittelwertfilter
 
-# Branch zusammenfuehren
-git merge feature/hinderniserkennung
-
-# Branch aufraeumen
-git branch -d feature/hinderniserkennung
+# Wenn nein: Branch einfach liegen lassen oder loeschen
+git branch -d feature/ultraschall-mittelwertfilter
 \end{lstlisting}
 
 \begin{merksatzBox}
-\texttt{main} ist immer der stabile Stand. Neue Ideen kommen auf
-eigene Branches. Ein Merge passiert nur, wenn die neue Funktion
-getestet und funktionstüchtig ist.
+\texttt{main} ist immer stabil. Neue Ideen kommen auf
+Feature-Branches. Ein Merge passiert erst, wenn die
+neue Funktion getestet und überlegen ist.
 \end{merksatzBox}
 
-\begin{robotikBox}
-In professionellen Robotikprojekten gibt es oft drei Branches:
-\texttt{main} (stabil), \texttt{develop} (Entwicklung) und
-Feature-Branches pro Funktion. Das erlaubt es, mehreren
-Entwicklern gleichzeitig sicher zu arbeiten.
-\end{robotikBox}
-
+% ── Kapitel 15 ────────────────────────────────────────────────
 \chapter{Wir wollen unser Projekt sichern und teilen}
 
 \kapitelziel{
-Du kannst ein lokales Repository mit GitHub verbinden und
-Änderungen push und pull.
+Du kannst deine Änderungen zu GitHub pushen und das Repo
+mit anderen teilen -- auch mit dem Raspberry Pi des Roboters.
 }
 \kapitelstruktur
 
 \section{Situation}
-Dein Robotik-Code liegt nur lokal auf dem Laptop. Der Rechner
-könnte abstürzen. Kollegen sollen mitarbeiten.
+
+Alle Änderungen sind lokal committed. Wenn der Laptop
+abstürzt, ist alles weg. Und der Raspberry Pi des Roboters
+hat noch keinen der neuen Dateien.
 
 \begin{aufgabeBox}
-Verbinde dein lokales Repository mit GitHub.
+Push die neuen Commits zu \texttt{wollbaer1971/robotik-uno-q}
+und richte auf dem Raspberry Pi einen automatischen Pull ein.
 \end{aufgabeBox}
 
 \begin{lstlisting}[style=bash]
-# SSH-Key für GitHub einrichten (einmalig)
-ssh-keygen -t ed25519 -C "w.becker@schule.de"
-cat ~/.ssh/id_ed25519.pub
-# Diesen Schlüssel bei GitHub unter Settings > SSH Keys eintragen
+# Aenderungen hochladen
+git push origin main
 
-# Repository mit GitHub verbinden
-git remote add origin git@github.com:wollbaer1971/robotik.git
-
-# Ersten Push
-git push -u origin main
-
-# Taeglicher Workflow
-git pull                   # Aktuelle Version holen
-# ... arbeiten ...
-git add .
-git commit -m "Sensor-Kalibrierung verbessert"
-git push                   # Hochladen
+# Auf dem Raspberry Pi (per SSH):
+ssh ros@192.168.1.100
+cd ~/robotik-uno-q
+git pull
+# stufe2_ros2/src/sensor_bridge.py ist jetzt auch auf dem Pi
 \end{lstlisting}
 
-\begin{loesungBox}
-\textbf{Guter täglicher Workflow:}
-\begin{enumerate}
-  \item \texttt{git pull} -- immer zuerst
-  \item Arbeiten, kleine Commits machen
-  \item \texttt{git push} -- am Ende des Tages
-\end{enumerate}
-\end{loesungBox}
+\begin{lstlisting}[style=bash]
+# Noch besser: Automatischer Pull beim Start
+# In start_roboter.sh ganz oben:
+echo "Aktualisiere Projektdateien..."
+cd $PROJEKT
+git pull --quiet
+\end{lstlisting}
+
+\begin{projektBox}
+\textbf{Bisher:} Lokale Git-History.\\
+\textbf{Heute:} Alle Änderungen auf GitHub -- Laptop-Absturz
+kostet nur eine Stunde, nicht drei Wochen.\\
+\textbf{Raspberry Pi:} Bei jedem Start automatisch aktuell.\\
+\textbf{Nächstes Kapitel:} Docker für reproduzierbare Umgebungen.
+\end{projektBox}
 
 \begin{merksatzBox}
-GitHub ist nicht Git -- GitHub ist ein Dienst, der Git-Repositories
-hostet. Git funktioniert komplett ohne GitHub. GitHub macht
-Zusammenarbeit und Backup einfach.
+\textbf{Täglicher Workflow:}
+1. \texttt{git pull} -- immer zuerst.
+2. Arbeiten, kleine Commits schreiben.
+3. \texttt{git push} -- am Ende des Tages oder nach jedem Feature.
+GitHub ist das Backup. Der Raspberry Pi zieht automatisch die
+neueste Version bei jedem Start.
 \end{merksatzBox}
 
 \begin{robotikBox}
-ROS2-Packages werden auf GitHub verteilt -- das ist die
-Infrastruktur, auf der die gesamte Open-Source-Robotik-Community
-aufgebaut ist. Wer Git beherrscht, kann aktiv zu ROS2-Paketen
-beitragen.
+Professionelle Robotikprojekte haben oft einen
+\enquote{Release}-Branch, der auf den Robotern läuft,
+und einen \enquote{develop}-Branch für laufende Entwicklung.
+Der Roboter führt automatisch \texttt{git pull} auf
+\texttt{release} aus -- niemals auf \texttt{develop}.
+Das verhindert, dass ein halbfertiges Feature den
+laufenden Roboter zum Absturz bringt.
 \end{robotikBox}
