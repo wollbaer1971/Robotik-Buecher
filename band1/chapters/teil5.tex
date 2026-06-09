@@ -5,45 +5,211 @@
 \chapter{Wir wollen einen Fehler rückgängig machen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst ein Git-Repository anlegen, Änderungen versionieren
+und frühere Stände wiederherstellen.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du hast drei Stunden an deinem Sensor-Code gearbeitet -- und ihn
+dabei kaputt gemacht. Strg+Z reicht nicht mehr.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Lerne, Änderungen in Git nachzuverfolgen und bei Bedarf
+auf einen früheren Stand zurückzusetzen.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Ohne Versionsverwaltung gibt es keinen Rückweg. Jede nicht
+gesicherte Änderung ist ein Risiko.
+\end{problemBox}
+
+\section{Git-Grundbefehle}
+
+\begin{lstlisting}[style=bash]
+# Repository anlegen
+cd ~/robotik
+git init
+git config user.name "Wolfgang Becker"
+git config user.email "w.becker@schule.de"
+
+# Ersten Commit erstellen
+git add .                       # Alle Dateien vormerken
+git commit -m "Erster Commit: Projektstruktur"
+
+# Aenderungen versionieren
+nano src/sensoren.py             # Datei bearbeiten
+git status                      # Was hat sich geaendert?
+git diff                        # Was genau ist anders?
+git add src/sensoren.py
+git commit -m "Ultraschall-Sensor: Mittelwert-Filterung ergaenzt"
+
+# Historie anzeigen
+git log                         # Alle Commits
+git log --oneline               # Kompakt
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Zurück zum letzten funktionierenden Stand:}
+\begin{lstlisting}[style=bash]
+# Letzte nicht committeten Aenderungen verwerfen
+git checkout -- src/sensoren.py
+
+# Auf bestimmten Commit zurueckgehen (Hash aus git log)
+git checkout abc1234 -- src/sensoren.py
+
+# Kompletten letzten Commit rueckgaengig machen (sicher)
+git revert HEAD
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+\textbf{Commit oft, commit früh.} Jeder Commit ist ein Sicherungspunkt.
+Gute Commit-Nachrichten sagen \textit{warum} -- nicht nur was.
+\enquote{Fix} ist eine schlechte Nachricht. \enquote{Ultraschall: Ausreißer bei
+< 5 cm ignoriert} ist eine gute.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+  \item \textbf{git add -A} ohne nachzudenken: Temporäre Dateien und
+        Passwörter landen im Repository.
+  \item \textbf{.gitignore vergessen:} Logfiles und \texttt{\_\_pycache\_\_} im Repo.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+Erstelle ein Repo, mache drei Commits mit jeweils einer Änderung.
+Mache den zweiten Commit mit \texttt{git revert} rückgängig ohne
+den dritten zu verlieren.
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+  \item Was speichert \texttt{git add}?
+  \item Was ist der Unterschied zwischen \texttt{git checkout} und \texttt{git revert}?
+  \item Welche Datei steuert, was Git ignoriert?
+\end{enumerate}
+\textbf{Antworten:} 1. Vorgemerkte Änderungen für den nächsten Commit (Staging Area).
+2. checkout setzt zurück (destruktiv), revert erstellt einen neuen Commit.
+3. \texttt{.gitignore}
+\end{quizBox}
+
+\begin{robotikBox}
+ROS2-Workspaces haben oft automatisch generierte Dateien
+(\texttt{install/}, \texttt{build/}, \texttt{log/}). Diese gehören nicht in
+Git -- sie entstehen beim Bauen neu. Die \texttt{.gitignore}:
+\begin{lstlisting}[style=text]
+build/
+install/
+log/
+*.db3
+\end{lstlisting}
+\end{robotikBox}
 
 \chapter{Wir wollen gefahrlos etwas ausprobieren}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst Git-Branches erstellen und verstehst, wie parallele
+Entwicklungsstränge funktionieren.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Die aktuelle Version des Roboters funktioniert. Du willst eine neue
+Hindernisvermeidung ausprobieren -- ohne die funktionierende
+Version zu gefährden.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Erstelle einen Branch, entwickle dort und merge zurück wenn fertig.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{lstlisting}[style=bash]
+# Branch erstellen und wechseln
+git checkout -b feature/hinderniserkennung
+
+# Entwickeln, testen, committen...
+nano src/navigation.py
+git add src/navigation.py
+git commit -m "Neue Hinderniserkennung: VFH-Algorithmus"
+
+# Zurueck zum Hauptzweig
+git checkout main
+
+# Branch zusammenfuehren
+git merge feature/hinderniserkennung
+
+# Branch aufraeumen
+git branch -d feature/hinderniserkennung
+\end{lstlisting}
+
+\begin{merksatzBox}
+\texttt{main} ist immer der stabile Stand. Neue Ideen kommen auf
+eigene Branches. Ein Merge passiert nur, wenn die neue Funktion
+getestet und funktionstüchtig ist.
+\end{merksatzBox}
+
+\begin{robotikBox}
+In professionellen Robotikprojekten gibt es oft drei Branches:
+\texttt{main} (stabil), \texttt{develop} (Entwicklung) und
+Feature-Branches pro Funktion. Das erlaubt es, mehreren
+Entwicklern gleichzeitig sicher zu arbeiten.
+\end{robotikBox}
 
 \chapter{Wir wollen unser Projekt sichern und teilen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst ein lokales Repository mit GitHub verbinden und
+Änderungen push und pull.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Dein Robotik-Code liegt nur lokal auf dem Laptop. Der Rechner
+könnte abstürzen. Kollegen sollen mitarbeiten.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Verbinde dein lokales Repository mit GitHub.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{lstlisting}[style=bash]
+# SSH-Key für GitHub einrichten (einmalig)
+ssh-keygen -t ed25519 -C "w.becker@schule.de"
+cat ~/.ssh/id_ed25519.pub
+# Diesen Schlüssel bei GitHub unter Settings > SSH Keys eintragen
 
+# Repository mit GitHub verbinden
+git remote add origin git@github.com:wollbaer1971/robotik.git
+
+# Ersten Push
+git push -u origin main
+
+# Taeglicher Workflow
+git pull                   # Aktuelle Version holen
+# ... arbeiten ...
+git add .
+git commit -m "Sensor-Kalibrierung verbessert"
+git push                   # Hochladen
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Guter täglicher Workflow:}
+\begin{enumerate}
+  \item \texttt{git pull} -- immer zuerst
+  \item Arbeiten, kleine Commits machen
+  \item \texttt{git push} -- am Ende des Tages
+\end{enumerate}
+\end{loesungBox}
+
+\begin{merksatzBox}
+GitHub ist nicht Git -- GitHub ist ein Dienst, der Git-Repositories
+hostet. Git funktioniert komplett ohne GitHub. GitHub macht
+Zusammenarbeit und Backup einfach.
+\end{merksatzBox}
+
+\begin{robotikBox}
+ROS2-Packages werden auf GitHub verteilt -- das ist die
+Infrastruktur, auf der die gesamte Open-Source-Robotik-Community
+aufgebaut ist. Wer Git beherrscht, kann aktiv zu ROS2-Paketen
+beitragen.
+\end{robotikBox}
