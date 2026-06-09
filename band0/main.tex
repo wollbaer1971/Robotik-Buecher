@@ -1,82 +1,28 @@
-% !TeX program = lualatex
-% ============================================================
-% Band 0: Die Robotik-Werkstatt
-% Linux, Docker und Entwicklungswerkzeuge für ROS2
-%
-% Compiler: LuaLaTeX (wegen fontspec)
-% In Overleaf: Menu → Compiler → LuaLaTeX
-%              Menu → Main document → band0/main.tex
-% ============================================================
 
-\documentclass[
-  11pt, a4paper, oneside,
-  parskip=half,
-  headings=normal,
-  bibliography=totoc,
-  listof=totoc
-]{scrbook}
+% ── Gemeinsame Konfiguration aller Bände ────────────────────
+\input{../shared/preamble}
 
-% ── LuaLaTeX-spezifische Pakete ──────────────────────────────
-\usepackage{fontspec}
-\setmainfont{Latin Modern Roman}
-\setsansfont{Latin Modern Sans}
-\setmonofont{Latin Modern Mono}
-\usepackage[ngerman]{babel}
-\usepackage{csquotes}
-\usepackage{microtype}
-\usepackage{hyphenat}
-\usepackage{tocbasic}
-
-% ── Layout ───────────────────────────────────────────────────
-\usepackage[
-  left=25mm, right=25mm, top=24mm, bottom=28mm,
-  headheight=16pt
-]{geometry}
-\usepackage{scrlayer-scrpage}
-\clearpairofpagestyles
-\ihead{\leftmark}
-\ohead{\pagemark}
-\pagestyle{scrheadings}
-
-% ── Basis-Pakete ─────────────────────────────────────────────
-\usepackage{xcolor}
-\usepackage[most]{tcolorbox}
-\tcbuselibrary{skins,breakable,listings}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{enumitem}
-\usepackage{listings}
-\setlist[itemize]{topsep=3pt,itemsep=2pt}
-\setlist[enumerate]{topsep=3pt,itemsep=2pt}
-
-% ── Werkstatt-Theme: Farben, Boxen, Listings ─────────────────
-\input{../shared/theme-werkstatt}
-
-% ── hyperref (nach Farbdefinitionen laden) ───────────────────
-\usepackage[
-  colorlinks=true,
-  linkcolor=WerkstattBlau,
-  urlcolor=WerkstattBlau,
-  citecolor=WerkstattBlau
-]{hyperref}
-
-% ── Band-Variablen (für shared/titelseite.tex kompatibel) ────
-\newcommand{\BuchReihe}{Robotik entwickeln lernen}
+% ── Band-spezifische Variablen ───────────────────────────────
 \newcommand{\BandTitel}{Die Robotik-Werkstatt}
 \newcommand{\BandUntertitel}{Linux, Docker und Entwicklungswerkzeuge für ROS2}
 \newcommand{\BandNummer}{0}
-\newcommand{\BandAutor}{Wolfgang Becker}
-\newcommand{\BandVersion}{Arbeitsfassung 2026}
-% \Werkreihe als Alias für ältere Makros
-\let\Werkreihe\BuchReihe
+
 
 % ── Dokument ─────────────────────────────────────────────────
 \begin{document}
 
 \frontmatter
-\input{chapters/titelseite}
-\input{chapters/frontmatter}
+\input{../shared/titelseite}
+
+\chapter*{Vorwort}
+
+Dieses Buch ist der Einstieg in eine Lernreihe zur Entwicklung mobiler Roboter und später auch von Roboterarmen. Es beginnt nicht mit ROS2, nicht mit Python und nicht mit komplizierter Mathematik. Es beginnt mit der Werkstatt.
+
+Wer Roboter entwickeln will, braucht eine Arbeitsumgebung, die zuverlässig, verständlich und wiederholbar ist. Genau darum geht es in diesem Band.
+
+Der Ansatz ist bewusst pragmatisch. Jedes Kapitel beginnt mit einer konkreten Aufgabe. Aus dieser Aufgabe entsteht eine Wissenslücke. Diese Wissenslücke wird geschlossen. Danach wird das Problem gelöst. Erst anschließend folgt die Vertiefung.
+
+\input{../shared/frontmatter}
 \tableofcontents
 
 \mainmatter
