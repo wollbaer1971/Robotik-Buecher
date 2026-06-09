@@ -1,0 +1,91 @@
+% ============================================================
+\chapter{Modul 10: Fehlerbehandlung}
+% ============================================================
+
+Sensoren liefern falsche Werte. Verbindungen brechen ab. Dateien fehlen. Ein Roboter, der bei jedem Fehler abstürzt, ist nutzlos. Fehlerbehandlung ist kein optionales Extra -- sie ist Sicherheitspflicht.
+
+\section{Lektion 29: Exceptions}
+
+\begin{lstlisting}
+import serial   # Serielle Kommunikation
+
+# OHNE Fehlerbehandlung -- gefaehrlich!
+# port = serial.Serial("/dev/ttyUSB0", 9600)  # Absturz wenn Port fehlt
+
+# MIT Fehlerbehandlung -- robust
+try:
+    port = serial.Serial("/dev/ttyUSB0", 9600, timeout=1)
+    daten = port.readline().decode("utf-8").strip()
+    wert  = float(daten)
+    print(f"Sensorwert: {wert}")
+
+except serial.SerialException as e:
+    print(f"FEHLER: Port nicht verfuegbar -- {e}")
+    wert = None
+
+except ValueError as e:
+    print(f"FEHLER: Ungueltige Daten '{daten}' -- {e}")
+    wert = None
+
+except Exception as e:
+    print(f"UNBEKANNTER FEHLER: {e}")
+    wert = None
+
+finally:
+    print("Verbindungsversuch abgeschlossen.")
+    # finally laeuft IMMER -- ideal fuer Aufraeumarbeiten
+\end{lstlisting}
+
+\begin{merksatz}
+\texttt{try} -- ``versuche das''. \texttt{except TypError} -- ``falls dieser Fehler auftritt''. \texttt{finally} -- ``das passiert immer, egal was''. Mehrere \texttt{except}-Blöcke fangen verschiedene Fehlertypen ab. Vom spezifischsten zum allgemeinsten.
+\end{merksatz}
+
+\section{Lektion 30: Robuste Programme}
+
+\begin{lstlisting}
+class RobusterSensor:
+    """Sensor mit eingebautem Fehler-Fallback."""
+
+    def __init__(self, port, max_versuche=3):
+        self.port          = port
+        self.max_versuche  = max_versuche
+        self.fehleranzahl  = 0
+        self.letzter_wert  = None
+
+    def lese(self):
+        for versuch in range(self.max_versuche):
+            try:
+                # Simulierter Sensorlesefehler
+                import random
+                if random.random() < 0.3:   # 30% Fehlerrate
+                    raise ValueError("Pruefsummenfehler")
+                wert = round(random.uniform(0.1, 2.0), 2)
+                self.letzter_wert = wert
+                self.fehleranzahl = 0
+                return wert
+
+            except ValueError as e:
+                self.fehleranzahl += 1
+                print(f"  Versuch {versuch+1}/{self.max_versuche}: {e}")
+
+        print(f"WARNUNG: Sensor {self.port} nach {self.max_versuche} Versuchen nicht erreichbar.")
+        return self.letzter_wert   # Letzten bekannten Wert zurueckgeben
+
+    def ist_ok(self):
+        return self.fehleranzahl < self.max_versuche
+
+
+sensor = RobusterSensor("ultraschall")
+for i in range(10):
+    wert = sensor.lese()
+    if wert is not None:
+        print(f"Abstand: {wert} m")
+\end{lstlisting}
+
+\begin{praxis}
+Echte Roboter nutzen dieses Muster überall: drei Versuche, dann Fallback. In sicherheitskritischen Systemen gibt es zusätzlich Watchdog-Timer: Wenn kein gültiger Sensorwert innerhalb von X Millisekunden -- Notabschaltung.
+\end{praxis}
+
+\begin{uebung}[title=Projektaufgabe Modul 10: Robuster Datenleser]
+Schreibe eine Funktion \texttt{lade\_config\_sicher(pfad)}, die eine JSON-Konfigurationsdatei lädt. Behandle: Datei nicht gefunden (\texttt{FileNotFoundError}), ungültiges JSON (\texttt{json.JSONDecodeError}), fehlende Pflichtparameter. Bei Fehler: Standardkonfiguration zurückgeben und Fehler loggen.
+\end{uebung}
