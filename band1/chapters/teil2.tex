@@ -118,7 +118,7 @@ ein Zeiger auf den Inode. Daher können mehrere Namen auf dieselbe Datei
 zeigen (\textit{Hardlinks}).
 
 Das Gerät \texttt{/dev/ttyUSB0} ist eine Datei. Das Netzwerkinterface
-\texttt{/proc/net/dev} ist eine Datei. Unter Linux ist \textit{alles} eine Datei.
+\texttt{/proc/net/dev} ist eine Datei. Viele Ressourcen werden unter Linux als Dateien dargestellt. Geräte, Pipes und zahlreiche Kernel-Schnittstellen lassen sich über das Dateisystem ansprechen.
 \end{haubeBox}
 
 \begin{robotikBox}
@@ -300,8 +300,7 @@ cp config.yaml.bak config.yaml
 
 \begin{merksatzBox}
 Vor jedem \texttt{rm -r} einmal \texttt{ls} -- um sicher zu sein, was weg soll.
-Ein \texttt{rm -rf /} löscht das gesamte System ohne Rückfrage. Linux
-vertraut dir.
+Ein \texttt{rm -rf /} löscht das gesamte System ohne Rückfrage. Dieser Befehl zerstört das komplette System und sollte niemals verwendet werden.
 \end{merksatzBox}
 
 \begin{fehlerBox}
@@ -441,8 +440,7 @@ die Kontrolle über alle gestarteten Nodes.
 \end{haubeBox}
 
 \begin{robotikBox}
-\texttt{ros2 node list} zeigt alle aktiven ROS2-Nodes. \texttt{ros2 node kill
-/sensor\_node} beendet einen Node sauber. Bei hängendem System:
+\texttt{ros2 node list} zeigt alle aktiven ROS2-Nodes. \texttt{ros2 lifecycle set /sensor_node shutdown} beendet einen Node sauber. Bei hängendem System:
 \begin{lstlisting}[style=bash]
 pkill -f ros2
 \end{lstlisting}
