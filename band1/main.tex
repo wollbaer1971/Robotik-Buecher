@@ -1,0 +1,47 @@
+\documentclass[11pt,a4paper,twoside]{scrbook}
+
+% ── Gemeinsame Konfiguration aller Bände ────────────────────
+\input{../shared/preamble}
+
+% ── Band-spezifische Variablen ───────────────────────────────
+\newcommand{\BuchReihe}{Python für Robotik und ROS2}
+\newcommand{\BandTitel}{Python für Robotik und ROS2}
+\newcommand{\BandUntertitel}{Band 1: Grundlagen bis ROS2-Einstieg}
+\newcommand{\BandNummer}{1}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Version 1.0 -- 2026}
+
+% ── Dokument ────────────────────────────────────────────────
+\begin{document}
+
+\frontmatter
+\input{../shared/titelseite}
+
+\chapter*{Vorwort}
+Dieses Buch entstand aus einer einfachen Überzeugung: Wer einen Roboter programmieren will, muss Python nicht vollständig kennen -- er muss die richtigen Teile kennen, zur richtigen Zeit.
+
+Der rote Faden: Ein Differentialantrieb-Roboter, der mit jedem Kapitel smarter wird. Am Ende des Buches fährt er autonom -- gesteuert von Python und ROS2.
+
+\tableofcontents
+
+\mainmatter
+\input{chapters/modul01}
+\input{chapters/modul02}
+\input{chapters/modul03}
+\input{chapters/modul04}
+\input{chapters/modul05}
+\input{chapters/modul06}
+\input{chapters/modul07}
+\input{chapters/modul08}
+\input{chapters/modul09}
+\input{chapters/modul10}
+\input{chapters/modul11}
+\input{chapters/modul12}
+\input{chapters/modul13}
+\input{chapters/modul14}
+\input{chapters/modul15}
+
+\appendix
+\input{chapters/loesungen}
+
+\end{document}
