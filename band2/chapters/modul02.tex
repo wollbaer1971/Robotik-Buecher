@@ -1,0 +1,114 @@
+% ============================================================
+\chapter{Modul 2: Entscheidungen treffen}
+% ============================================================
+
+Ein Roboter, der nur stur geradeaus fährt, ist kein autonomes System -- er ist ein ferngesteuertes Fahrzeug. Autonomie beginnt mit der Fähigkeit, Situationen zu beurteilen und zu reagieren. Genau das lernen wir hier.
+
+\section{Lektion 5: Bedingungen mit \texttt{if}}
+
+\begin{analogie}
+Jeder Fahrstuhl kennt folgende Logik: \textit{Wenn Tür offen, dann fahre nicht.} Das ist eine Bedingung. Bedingungen sind das Grundprinzip aller Sicherheitssysteme -- und aller autonomen Roboter.
+\end{analogie}
+
+\begin{lstlisting}
+abstand = 0.18   # Meter, gemessen vom Ultraschallsensor
+
+if abstand < 0.20:
+    print("Hindernis erkannt!")
+    print("Stoppe Motoren.")
+\end{lstlisting}
+
+\begin{merksatz}
+Die Syntax: \texttt{if BEDINGUNG:} -- danach eingerückter Block. Einrückung ist in Python \textbf{Pflicht}, nicht Stil. Falsche Einrückung = Fehler.
+\end{merksatz}
+
+\subsection*{if -- elif -- else}
+
+\begin{lstlisting}
+abstand = 0.35   # Meter
+
+if abstand < 0.20:
+    print("STOP: Hindernis zu nah!")
+elif abstand < 0.50:
+    print("WARNUNG: Langsam fahren.")
+elif abstand < 1.00:
+    print("OK: Normal fahren.")
+else:
+    print("FREI: Volle Geschwindigkeit.")
+\end{lstlisting}
+
+\begin{praxis}
+Dieses Muster -- Abstandsstufen mit unterschiedlichen Reaktionen -- ist der Kern jeder Hindernisvermeidung. In echten Systemen heißen die Schwellenwerte Parameter und werden aus Konfigurationsdateien geladen (siehe Modul 7).
+\end{praxis}
+
+\begin{uebung}[title=Übung 2.1: Akkumanagement]
+Schreibe eine Bedingungslogik für den Akkustand:
+\begin{itemize}
+    \item unter 10\%: ``KRITISCH -- Sofort laden!''
+    \item unter 25\%: ``NIEDRIG -- Ladestation anfahren.''
+    \item unter 50\%: ``MITTEL -- Aufgabe beenden, dann laden.''
+    \item sonst: ``GUT -- Weiter arbeiten.''
+\end{itemize}
+\end{uebung}
+
+\section{Lektion 6: Vergleichsoperatoren}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Operator} & \textbf{Bedeutung} & \textbf{Robotik-Beispiel} \\
+\midrule
+\texttt{==} & gleich            & \texttt{status == "bereit"} \\
+\texttt{!=} & ungleich          & \texttt{fehler != None} \\
+\texttt{<}  & kleiner           & \texttt{akku < 20} \\
+\texttt{>}  & größer            & \texttt{temp > 80} \\
+\texttt{<=} & kleiner gleich    & \texttt{last < max\_last} \\
+\texttt{>=} & größer gleich     & \texttt{spannung >= 11.0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{merksatz}
+\texttt{=} weist einen Wert zu. \texttt{==} vergleicht. Dieser Unterschied ist eine der häufigsten Fehlerquellen in Python. \texttt{akku = 20} speichert 20. \texttt{akku == 20} fragt: \textit{Ist akku gleich 20?}
+\end{merksatz}
+
+\section{Lektion 7: Logische Operatoren}
+
+\begin{lstlisting}
+spannung     = 12.1
+strom        = 0.45
+notaus       = False
+sensor_ok    = True
+
+# and: beide muessen True sein
+if spannung >= 11.0 and strom < 2.0:
+    print("Elektrische Parameter: OK")
+
+# or: mindestens eine muss True sein
+if spannung < 10.0 or notaus:
+    print("STOP: Sicherheitsunterbrechung!")
+
+# not: kehrt True/False um
+if not sensor_ok:
+    print("WARNUNG: Sensor nicht erreichbar.")
+
+# Kombination: Prioritaetslogik
+if notaus:
+    print("NOTAUS -- Alles stoppen.")
+elif spannung < 11.0 or strom > 3.0:
+    print("Elektrisches Problem erkannt.")
+elif sensor_ok and spannung >= 11.0:
+    print("System betriebsbereit.")
+\end{lstlisting}
+
+\begin{praxis}
+Reale Sicherheitssysteme kombinieren immer mehrere Bedingungen. Ein Roboterarm darf sich nur bewegen, wenn: Tür geschlossen \texttt{and} Notaus nicht aktiv \texttt{and} Stromversorgung stabil. Alle drei müssen gleichzeitig \texttt{True} sein.
+\end{praxis}
+
+\begin{uebung}[title=Projektaufgabe Modul 2: Sicherheits-Check]
+Schreibe einen vollständigen Sicherheits-Check für den Roboter-Start. Prüfe mindestens vier Bedingungen (Akku, Sensoren, Notaus, Kommunikation). Nutze \texttt{and}, \texttt{or}, \texttt{not}. Gib klare Statusmeldungen aus.
+\end{uebung}
+
+\begin{ros}
+In ROS2 entspricht diese Logik dem \textit{Lifecycle Node}: Ein Node geht nur in den Zustand ``aktiv'', wenn alle Vorbedingungen erfüllt sind. Die Prüflogik sieht fast identisch aus wie der Code in dieser Übung.
+\end{ros}
