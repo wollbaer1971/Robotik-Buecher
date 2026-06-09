@@ -5,30 +5,155 @@
 \chapter{Wir wollen ein Projekt übersichtlich anlegen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst ein Robotikprojekt mit einer sinnvollen Verzeichnisstruktur
+anlegen, die mit ROS2 kompatibel ist.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Dein Robotikprojekt hat Python-Skripte, Konfigurationsdateien,
+Logdateien und Dokumentation. Alles liegt im selben Ordner.
+Suchen dauert länger als Programmieren.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Lege eine übersichtliche Projektstruktur an, die auch für
+spätere ROS2-Integration vorbereitet ist.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Keine Struktur bedeutet: Dateien verlieren, Versionen
+durcheinander bringen, Kollegen nicht einbeziehen können.
+\end{problemBox}
+
+\section{Die empfohlene Projektstruktur}
+
+\begin{lstlisting}[style=text]
+~/robotik/
+├── README.md              # Projektbeschreibung
+├── .gitignore             # Was Git ignorieren soll
+├── docs/                  # Dokumentation
+├── config/                # YAML-Konfigurationsdateien
+│   ├── roboter.yaml
+│   └── kamera.yaml
+├── scripts/               # Hilfsskripte
+│   └── start_alle.sh
+├── src/                   # Python-Quellcode
+│   ├── sensoren.py
+│   ├── motoren.py
+│   └── navigation.py
+├── tests/                 # Tests
+├── logs/                  # Laufzeit-Logs (in .gitignore)
+└── ros2_ws/               # ROS2-Workspace (spaeter)
+    └── src/
+\end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[style=bash]
+# Komplette Struktur mit einem Skript anlegen
+mkdir -p ~/robotik/{docs,config,scripts,src,tests,logs}
+touch ~/robotik/README.md
+touch ~/robotik/.gitignore
+
+# .gitignore befuellen
+cat > ~/robotik/.gitignore << 'GITEOF'
+logs/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+GITEOF
+
+echo "Projektstruktur angelegt."
+ls ~/robotik/
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{merksatzBox}
+Struktur von Anfang an. Eine gute Verzeichnisstruktur kostet
+10 Minuten einmalig und spart Stunden später. Sie ist auch
+die Einladungskarte für Kollegen: Wer den Ordner öffnet,
+soll sofort verstehen, wo was ist.
+\end{merksatzBox}
+
+\begin{robotikBox}
+Ein ROS2-Paket hat eine vorgeschriebene Struktur:
+\texttt{package.xml}, \texttt{setup.py}, \texttt{resource/}, \texttt{launch/}.
+Wer schon eine saubere Projektstruktur hat, findet sich in
+ROS2-Paketen sofort zurecht -- die Prinzipien sind identisch.
+\end{robotikBox}
 
 \chapter{Wir wollen komfortabel programmieren}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du kannst VS Code für Robotikentwicklung einrichten und effektiv
+nutzen -- lokal und über SSH auf dem Roboter.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Du entwickelst auf dem Laptop, der Roboter läuft auf einem
+Raspberry Pi. Code übertragen, ausführen, debuggen -- das
+muss reibungslos gehen.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Richte VS Code so ein, dass du direkt auf dem Raspberry Pi
+programmieren kannst, als wäre es dein lokaler Rechner.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Terminal-Editoren allein sind für größere Projekte zu langsam.
+Aber grafische IDEs erreichen den Roboter nicht direkt.
+\end{problemBox}
 
+\section{VS Code einrichten}
+
+\begin{lstlisting}[style=bash]
+# Installation (Ubuntu)
+sudo apt install code
+
+# Wichtige Extensions (im VS Code Terminal installieren):
+# Python (ms-python.python)
+# Remote - SSH (ms-vscode-remote.remote-ssh)
+# YAML (redhat.vscode-yaml)
+# GitLens (eamodio.gitlens)
+\end{lstlisting}
+
+\begin{lstlisting}[style=text]
+# ~/.ssh/config -- SSH-Verbindung konfigurieren
+Host roboter
+    HostName 192.168.1.100
+    User ros
+    IdentityFile ~/.ssh/id_rsa
+\end{lstlisting}
+
+\begin{lstlisting}[style=bash]
+# SSH-Key generieren (einmalig)
+ssh-keygen -t rsa -b 4096
+ssh-copy-id ros@192.168.1.100
+
+# Jetzt per VS Code: Strg+Shift+P -> "Remote-SSH: Connect to Host"
+# -> "roboter" -> Passwortlos einloggen
+\end{lstlisting}
+
+\begin{loesungBox}
+\textbf{Remote-Workflow:}
+\begin{enumerate}
+  \item VS Code öffnen → Remote-SSH → Roboter verbinden
+  \item Projektordner \texttt{\textasciitilde/robotik} öffnen
+  \item Code bearbeiten, Terminal nutzen, Dateien speichern
+  \item Alles läuft auf dem Roboter -- kein manuelles Übertragen
+\end{enumerate}
+\end{loesungBox}
+
+\begin{merksatzBox}
+SSH + VS Code Remote ist der professionelle Standard für
+Embedded-Entwicklung. Einmal eingerichtet, ist der Remote-Rechner
+genauso komfortabel zu bedienen wie der lokale.
+\end{merksatzBox}
+
+\begin{robotikBox}
+ROS2-Entwickler arbeiten meist mit VS Code + Remote-SSH,
+weil der Roboter keinen eigenen Bildschirm hat. Die ROS2-Extension
+für VS Code bietet zusätzlich Topic-Browser und Node-Graph
+direkt in der IDE.
+\end{robotikBox}
