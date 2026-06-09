@@ -1,0 +1,66 @@
+% ============================================================
+\chapter{Modul 12: Jupyter Notebooks}
+% ============================================================
+
+\section{Lektion 34: Arbeiten wie ein Ingenieur}
+
+Jupyter Notebooks kombinieren Code, Ergebnisse, Diagramme und Erklärungen in einem einzigen Dokument. Für Robotik-Ingenieure sind sie das ideale Werkzeug zur Datenanalyse und zum Experimentieren.
+
+\subsection*{Installation und Start}
+
+\begin{lstlisting}
+# Terminal/Kommandozeile:
+pip install jupyterlab
+jupyter lab   # Startet im Browser
+\end{lstlisting}
+
+\subsection*{Notebook-Zellen}
+
+Ein Notebook besteht aus \textbf{Zellen}. Jede Zelle ist entweder Code oder Markdown-Text.
+
+\begin{lstlisting}
+# Code-Zelle: wird ausgefuehrt mit Shift+Enter
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Ergebnis erscheint direkt unter der Zelle
+x = np.linspace(0, 2*np.pi, 100)
+y = np.sin(x)
+print(f"Max: {y.max():.4f}")
+\end{lstlisting}
+
+\begin{merksatz}
+Notebooks sind \textbf{nicht} für Produktions-Code -- sie sind für Analyse und Experimente. Den fertigen, getesteten Code lagert man in \texttt{.py}-Dateien aus, die das Notebook importiert.
+\end{merksatz}
+
+\section{Lektion 35: Sensordaten analysieren}
+
+\begin{lstlisting}
+import numpy as np
+import pandas as pd   # pip install pandas
+
+# CSV-Sensorlog laden
+df = pd.read_csv("sensor_log.csv")
+
+# Schnelle Uebersicht
+print(df.describe())     # Statistik aller Spalten
+print(df.head())         # Erste 5 Zeilen
+
+# Filtern: nur Messungen mit Hindernis
+hindernisse = df[df["abstand_m"] < 0.5]
+print(f"Hindernisereignisse: {len(hindernisse)}")
+
+# Zeitreihe glaetten (gleitender Mittelwert)
+df["abstand_geglaettet"] = df["abstand_m"].rolling(window=5).mean()
+
+# Exportieren
+df.to_csv("analysiert.csv", index=False)
+\end{lstlisting}
+
+\begin{praxis}
+Nach einem Testlauf mit dem echten Roboter öffnet man das Notebook, lädt den Log und analysiert in wenigen Minuten: Wo war die Fehlerrate am höchsten? Wie hat sich der Akku verhalten? Welche Sensorwerte waren Ausreißer?
+\end{praxis}
+
+\begin{uebung}[title=Projektaufgabe Modul 12: Testfahrt-Analyse]
+Generiere einen simulierten Fahrt-Log (100 Zeilen, CSV: Zeit, X, Y, Akku, Abstand\_vorne). Lade ihn in ein Jupyter Notebook. Berechne: Gesamtstrecke (aus X/Y-Positionen), Akku-Verbrauch pro Meter, Anteil der Zeit mit Hindernis $<$ 0.5 m.
+\end{uebung}
