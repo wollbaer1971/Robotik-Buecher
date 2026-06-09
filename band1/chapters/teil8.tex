@@ -2,64 +2,89 @@
 \part{Hardwarebezug}
 % ============================================================
 
-\chapter{Wir wollen ein USB-Gerät unter Linux finden}
+\chapter{Wir wollen den Arduino UNO Q unter Linux finden}
 
 \kapitelziel{
-Du kannst USB-Geräte unter Linux identifizieren, den
-richtigen Gerätepfad finden und stabile Gerätezuordnungen
-über udev-Regeln einrichten.
+Du kannst den Arduino UNO Q unter Linux identifizieren,
+den richtigen Gerätepfad finden und per udev-Regel
+den stabilen Namen \texttt{/dev/arduino} einrichten.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du schließt deinen Arduino Uno an den Raspberry Pi an.
-Python sagt: \texttt{serial.SerialException: [Errno 2] No such
-file or directory: '/dev/ttyUSB0'}. Vielleicht ist es
-\texttt{ttyACM0}? Oder \texttt{ttyUSB1}?
+
+Der Arduino UNO Q ist per USB am Raspberry Pi angeschlossen.
+\texttt{sensor\_bridge.py} öffnet \texttt{/dev/arduino} --
+aber die Datei existiert nicht. War es \texttt{ttyUSB0}?
+Oder \texttt{ttyACM0}? Und morgen, wenn noch ein
+USB-Gerät angesteckt ist, vielleicht \texttt{ttyACM1}?
 
 \begin{aufgabeBox}
-Finde den korrekten Gerätepfad für dein USB-Gerät und
-mache ihn stabil -- unabhängig von der Einsteckreihenfolge.
+Finde den Gerätepfad des Arduino UNO Q und richte per
+udev-Regel den stabilen Namen \texttt{/dev/arduino} ein.
 \end{aufgabeBox}
 
 \begin{problemBox}
 Linux vergibt Gerätepfade dynamisch beim Einstecken.
-\texttt{ttyUSB0} kann morgen \texttt{ttyUSB1} sein -- je nachdem,
-was zuerst eingesteckt wird.
+\texttt{ttyACM0} kann morgen \texttt{ttyACM1} sein -- je nachdem,
+was zuerst eingesteckt wird. Ohne stabile Benennung muss
+jeder Entwickler den Port manuell suchen.
 \end{problemBox}
 
-\begin{wissenBox}
-Wir brauchen: \texttt{lsusb}, \texttt{dmesg}, das \texttt{/dev/}-Verzeichnis
-und udev-Regeln für stabile Gerätezuordnung.
-\end{wissenBox}
+\begin{haubeBox}
+\textbf{Warum heißt es \texttt{/dev/ttyACM0}?}
+
+\texttt{tty} kommt von \textit{Teletype} -- uralten Fernschreibern,
+die über serielle Leitungen mit Computern verbunden waren.
+Jeder serielle Port in Linux, egal ob echte Hardware oder USB,
+wird als \texttt{tty}-Gerät modelliert.
+
+\texttt{ACM} steht für \textit{Abstract Control Model} --
+das USB-Klasse-Protokoll, das der Arduino-Bootloader verwendet.
+Deshalb erscheint der Arduino als \texttt{ttyACM},
+nicht als \texttt{ttyUSB}: er spricht ein anderes Protokoll.
+\end{haubeBox}
 
 \section{Gerät identifizieren}
 
 \begin{lstlisting}[style=bash]
-# Alle USB-Geraete anzeigen
+# Arduino anstecken, dann:
+dmesg | tail -15
+# [...] cdc_acm 1-1.4:1.0: ttyACM0: USB ACM device
+# -> Port ist /dev/ttyACM0
+
+# USB-Geraete anzeigen
 lsusb
-# Ausgabe z.B.:
-# Bus 001 Device 003: ID 2341:0043 Arduino SA Uno R3
+# Bus 001 Device 005: ID 2341:0069 Arduino SA
+# Vendor-ID: 2341 (Arduino SA)
+# Product-ID: 0069 (UNO Q / R3)
 
-# Geraet einstecken und Kernelmeldungen lesen
-dmesg | tail -20
-# Ausgabe z.B.:
-# [12345.678] usb 1-1.4: new full-speed USB device
-# [12345.890] cdc_acm 1-1.4:1.0: ttyACM0: USB ACM device
+# Details fuer udev-Regel
+udevadm info /dev/ttyACM0 | grep -E "ID_VENDOR_ID|ID_MODEL_ID|ID_SERIAL"
+# ID_VENDOR_ID=2341
+# ID_MODEL_ID=0069
+# ID_SERIAL=Arduino_UNO_Q_...
 
-# Serielle Ports anzeigen
-ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-
-# Details zu einem Geraet
-udevadm info /dev/ttyACM0 | grep -E "ID_SERIAL|ID_VENDOR|ID_MODEL"
+# Serielle Verbindung testen (9600 Baud wie im Sketch)
+stty -F /dev/ttyACM0 9600 raw
+cat /dev/ttyACM0
+# R=87 cm  L=124 cm  <- Arduino sendet!
+# Strg+C zum Beenden
 \end{lstlisting}
 
-\section{Stabile Gerätezuordnung mit udev}
+\section{Stabile Benennung mit udev}
 
 \begin{lstlisting}[style=text]
 # /etc/udev/rules.d/99-arduino.rules
-# Arduino immer als /dev/arduino erreichbar machen
+# Arduino UNO R3 und UNO Q immer als /dev/arduino
 
+SUBSYSTEM=="tty", \
+ATTRS{idVendor}=="2341", \
+ATTRS{idProduct}=="0069", \
+SYMLINK+="arduino", \
+MODE="0666"
+
+# Fuer Arduino UNO R3 (ATmega328P) falls andere Product-ID:
 SUBSYSTEM=="tty", \
 ATTRS{idVendor}=="2341", \
 ATTRS{idProduct}=="0043", \
@@ -69,190 +94,217 @@ MODE="0666"
 
 \begin{lstlisting}[style=bash]
 # Regel aktivieren
+sudo nano /etc/udev/rules.d/99-arduino.rules
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 
-# Pruefen
+# Pruefen (Arduino muss eingesteckt sein)
 ls -la /dev/arduino
-# -> /dev/arduino -> ttyACM0
+# /dev/arduino -> ttyACM0
+
+# Benutzer zur dialout-Gruppe hinzufuegen (einmalig)
+sudo usermod -aG dialout $USER
+# Neu einloggen!
+
+# Jetzt funktioniert:
+python3 stufe2_ros2/src/sensor_bridge.py
 \end{lstlisting}
 
-\begin{loesungBox}
-Nach der udev-Regel:
-\begin{lstlisting}[style=python]
-import serial
-# Immer dieser Pfad -- egal ob ttyACM0 oder ttyACM1
-arduino = serial.Serial('/dev/arduino', 9600, timeout=1)
-\end{lstlisting}
-Der Name \texttt{/dev/arduino} bleibt stabil.
-\end{loesungBox}
+\begin{projektBox}
+\textbf{Bisher:} \texttt{sensor\_bridge.py} öffnet
+\texttt{/dev/arduino} -- der Pfad existierte nicht.\\
+\textbf{Heute:} udev-Regel eingerichtet.
+\texttt{/dev/arduino} zeigt immer auf den richtigen Port,
+egal in welcher Reihenfolge Geräte eingesteckt werden.\\
+\textbf{Auch in docker-compose.yml:}
+\texttt{devices: ["/dev/arduino:/dev/arduino"]} funktioniert jetzt.
+\end{projektBox}
 
 \begin{merksatzBox}
-udev-Regeln identifizieren Geräte über ihre USB-IDs (Vendor + Product),
-nicht über den zufälligen Gerätepfad. So bekommt dasselbe physische
-Gerät immer denselben Namen -- unverzichtbar für robuste Systeme.
+udev identifiziert Geräte über USB-IDs, nicht über den
+zufälligen Gerätepfad. Vendor-ID \texttt{2341} gehört
+immer zu Arduino SA -- egal auf welchem Raspberry Pi
+und egal welcher Port vergeben wird.
 \end{merksatzBox}
 
 \begin{fehlerBox}
 \begin{itemize}
-  \item \textbf{Permission denied auf /dev/ttyUSB0:}\\
-        \texttt{sudo usermod -aG dialout \$USER} und neu einloggen.
-  \item \textbf{Falscher Pfad:} Immer mit \texttt{dmesg | tail} prüfen,
-        welcher Pfad beim Einstecken vergeben wurde.
+  \item \textbf{Permission denied:}
+        \texttt{sudo usermod -aG dialout \$USER} -- dann neu einloggen.
+  \item \textbf{/dev/arduino existiert nicht nach Neustart:}
+        Regel-Datei hat Tippfehler. Prüfen mit
+        \texttt{udevadm test \$(udevadm info -q path /dev/ttyACM0)}.
 \end{itemize}
 \end{fehlerBox}
 
-\begin{uebungBox}
-Stecke einen Arduino oder einen USB-Serial-Adapter an.
-Finde mit \texttt{dmesg} und \texttt{lsusb} Vendor-ID und Product-ID.
-Schreibe eine udev-Regel und teste sie.
-\end{uebungBox}
-
-\begin{quizBox}
-\begin{enumerate}
-  \item Warum ist \texttt{/dev/ttyUSB0} kein stabiler Pfad?
-  \item Was speichern udev-Regeln zur Geräteidentifikation?
-  \item Welcher Befehl zeigt Kernel-Meldungen beim Einstecken?
-\end{enumerate}
-\textbf{Antworten:} 1. Der Pfad wird dynamisch vergeben und ändert sich.
-2. USB Vendor-ID und Product-ID (nicht den Pfad).
-3. \texttt{dmesg | tail}
-\end{quizBox}
-
-\begin{haubeBox}
-\textbf{udev} ist das Linux-Subsystem für Geräteverwaltung. Es läuft
-als Daemon und reagiert auf Kernel-Events beim Einstecken/Entfernen.
-Regeln können nicht nur Symlinks erzeugen, sondern auch Skripte
-ausführen -- z.\,B. automatisch einen Treiber laden oder eine
-Anwendung starten, wenn ein Gerät eingesteckt wird.
-\end{haubeBox}
-
 \begin{robotikBox}
-ROS2-Treiber für Lidar, Kameras und IMUs nutzen udev-Regeln
-standardmäßig. Das \texttt{ros-jazzy-lidar-driver}-Paket installiert
-automatisch eine udev-Regel -- deshalb funktioniert der Lidar
-sofort nach dem Einstecken, ohne manuelle Pfadkonfiguration.
+ROS2-Treiber für Lidar-Scanner, Kameras und IMUs installieren
+automatisch udev-Regeln. Das \texttt{ros-jazzy-rplidar-ros}-Paket
+legt \texttt{/dev/rplidar} an -- nach demselben Prinzip.
+Wer es einmal selbst eingerichtet hat, versteht warum
+ROS2-Hardware \enquote{einfach funktioniert}.
 \end{robotikBox}
 
 % ── Kapitel 24 ────────────────────────────────────────────────
-\chapter{Wir wollen verstehen, wie ein Computer später einen Motor steuert}
+\chapter{Wir wollen den Differentialantrieb von Python aus steuern}
 
 \kapitelziel{
-Du verstehst das Prinzip der PWM-Motorsteuerung und kannst
-mit Python über Serial-Kommunikation einen Arduino ansprechen.
+Du verstehst das Kommunikationsprotokoll zwischen
+differentialantrieb.ino und Python und implementierst
+die Motorsteuerung für \texttt{stufe2\_ros2/}.
 }
 \kapitelstruktur
 
 \section{Situation}
-Du willst den linken Motor des Roboters mit 50\% Geschwindigkeit
-vorwärts fahren lassen. Wie wird dieser Wunsch zur Spannung am Motor?
+
+\texttt{differentialantrieb.ino} fährt zurzeit blind
+geradeaus. Die Hinderniserkennung ist getrennt.
+In Stufe~2 soll Python die Intelligenz übernehmen:
+Sensordaten empfangen, entscheiden, Motorbefehle senden.
 
 \begin{aufgabeBox}
-Verstehe die Kette vom Python-Befehl über Serial und Arduino
-bis zum Motorstrom.
+Erweitere \texttt{differentialantrieb.ino} um einen
+Serial-Befehlsempfänger und implementiere die passende
+Python-Klasse \texttt{MotorBridge} in \texttt{stufe2\_ros2/}.
 \end{aufgabeBox}
 
 \begin{wissenBox}
-Wir brauchen: PWM-Grundlagen, die Serial-Kommunikation
-zwischen Linux und Arduino und das L298N-Motortreiber-Prinzip.
+Wir brauchen: das bestehende L298N-Protokoll aus
+\texttt{differentialantrieb.ino}, Serial-Kommunikation
+und das Prinzip: Python = Intelligenz, Arduino = Echtzeit.
 \end{wissenBox}
 
-\section{PWM -- Pulsweite steuert Leistung}
+\section{Das bestehende L298N-Interface}
+
+Aus \texttt{differentialantrieb.ino} kennen wir bereits:
 
 \begin{lstlisting}[style=text]
-PWM (Pulse Width Modulation):
-   _____     _____     _____
-  |     |   |     |   |     |     50% Duty Cycle -> halbe Leistung
-  |     |___|     |___|     |___
+Motor A (links):  ENA=D5(PWM), IN1=D4, IN2=D7
+Motor B (rechts): ENB=D6(PWM), IN3=D8, IN4=D12
 
-   ________  ________  ________
-  |        ||        ||        |  80% Duty Cycle -> 80% Leistung
-  |        ||        ||        |__
+Pinbelegung aus docs/Verdrahtung.md:
+  vorwaerts(n):   IN1=H IN2=L IN3=H IN4=L, ENA=ENB=n
+  rueckwaerts(n): IN1=L IN2=H IN3=L IN4=H, ENA=ENB=n
+  links(n):       IN1=L IN2=H IN3=H IN4=L, ENA=ENB=n
+  rechts(n):      IN1=H IN2=L IN3=L IN4=H, ENA=ENB=n
+  stopp():        alle LOW, ENA=ENB=0
 \end{lstlisting}
 
-\section{Kommunikation: Linux → Arduino → Motor}
-
-\begin{lstlisting}[style=python]
-# motor_control.py -- Python auf Linux-Seite
-import serial, time
-
-class MotorController:
-    """Sendet Fahrbefehle an Arduino via Serial."""
-    
-    def __init__(self, port='/dev/arduino', baudrate=9600):
-        self.ser = serial.Serial(port, baudrate, timeout=1)
-        time.sleep(2)  # Arduino reset-Zeit abwarten
-    
-    def fahre(self, links_pwm: int, rechts_pwm: int):
-        """PWM-Werte 0-255, negativ = rueckwaerts."""
-        befehl = f"M {links_pwm} {rechts_pwm}\n"
-        self.ser.write(befehl.encode())
-        antwort = self.ser.readline().decode().strip()
-        return antwort
-    
-    def stopp(self):
-        return self.fahre(0, 0)
-    
-    def __del__(self):
-        if self.ser.is_open:
-            self.stopp()
-            self.ser.close()
-
-# Verwendung
-mc = MotorController('/dev/arduino')
-
-print("Vorwaerts...")
-mc.fahre(150, 150)
-time.sleep(2)
-
-print("Kurve links...")
-mc.fahre(50, 150)
-time.sleep(1)
-
-print("Stopp.")
-mc.stopp()
-\end{lstlisting}
+\section{Arduino-Erweiterung: Befehle empfangen}
 
 \begin{lstlisting}[style=text]
-// Arduino-Seite (vereinfacht)
-// Empfängt "M links rechts\n" und steuert L298N
+// Ergaenzung in differentialantrieb.ino:
+// Am Ende von loop() hinzufuegen:
 
 void loop() {
-  if (Serial.available()) {
+  if (kontaktAusgeloest) {
+    ausfuehrenAusweichmanoever();
+    return;
+  }
+
+  // NEU: Serial-Befehle von Python empfangen
+  if (Serial.available() > 0) {
     String cmd = Serial.readStringUntil('\n');
-    if (cmd.startsWith("M ")) {
-      int l = cmd.substring(2, cmd.indexOf(' ', 2)).toInt();
-      int r = cmd.substring(cmd.lastIndexOf(' ')+1).toInt();
-      setMotors(l, r);
-      Serial.println("OK");
+    cmd.trim();
+
+    if (cmd == "S")          { stopp(); }
+    else if (cmd == "V")     { vorwaerts(SPEED_NORMAL); }
+    else if (cmd == "R")     { rueckwaerts(SPEED_RUECKWAERTS); }
+    else if (cmd == "L")     { links(SPEED_DREHEN); }
+    else if (cmd == "D")     { rechts(SPEED_DREHEN); }
+    else if (cmd.startsWith("P ")) {
+      // "P links rechts" -- individuelle PWM-Werte
+      int sp = cmd.indexOf(' ');
+      int lp = cmd.indexOf(' ', sp+1);
+      int l  = cmd.substring(sp+1, lp).toInt();
+      int r  = cmd.substring(lp+1).toInt();
+      // Motorsteuerung mit individuellen Werten...
+      vorwaerts(l); // vereinfacht
     }
+    Serial.println("OK");
+  }
+  else {
+    // Kein Befehl: Stopp (Python entscheidet)
+    stopp();
   }
 }
 \end{lstlisting}
 
-\begin{loesungBox}
-Die vollständige Kette:
-\begin{enumerate}
-  \item Python: \texttt{mc.fahre(150, 150)} → String \texttt{"M 150 150\textbackslash n"}
-  \item Serial: Bytes über USB-Kabel zum Arduino
-  \item Arduino: parst Befehl, setzt PWM-Signal
-  \item L298N: verstärkt PWM zu 12V-Motorstrom
-  \item DC-Motor: dreht mit proportionaler Geschwindigkeit
-\end{enumerate}
-\end{loesungBox}
+\section{Python-Seite: MotorBridge}
+
+\begin{lstlisting}[style=python]
+# stufe2_ros2/src/motor_bridge.py
+import serial, time
+
+class MotorBridge:
+    BEFEHLE = {
+        'stop':      'S',
+        'vor':       'V',
+        'zurueck':   'R',
+        'links':     'L',
+        'rechts':    'D',
+    }
+
+    def __init__(self, port='/dev/arduino', baud=9600):
+        self.ser = serial.Serial(port, baud, timeout=1)
+        time.sleep(2)  # Arduino Neustart abwarten
+        print(f"[motor_bridge] Verbunden: {port}")
+
+    def sende(self, befehl):
+        cmd = self.BEFEHLE.get(befehl, 'S')
+        self.ser.write(f"{cmd}\n".encode())
+        antwort = self.ser.readline().decode().strip()
+        return antwort == "OK"
+
+    def navigiere(self, rechts_cm, links_cm):
+        minimum = min(rechts_cm, links_cm)
+        if minimum < 25:
+            self.sende('stop')
+        elif minimum < 50:
+            self.sende('vor')   # wird langsamer in Band 2
+        elif rechts_cm < links_cm:
+            self.sende('links')
+        else:
+            self.sende('vor')
+
+    def __del__(self):
+        if hasattr(self, 'ser') and self.ser.is_open:
+            self.sende('stop')
+            self.ser.close()
+
+# Verwendung:
+# motor = MotorBridge('/dev/arduino')
+# motor.navigiere(rechts_cm=87, links_cm=124)
+\end{lstlisting}
+
+\begin{projektBox}
+\textbf{Heute:} \texttt{stufe2\_ros2/src/motor\_bridge.py} --
+Python steuert die Motoren über das Extended Serial-Protokoll.\\
+\textbf{Die Kette ist vollständig:}
+\texttt{hinderniserkennung.ino} $\to$ \texttt{sensor\_bridge.py}
+$\to$ \texttt{SensorBus} $\to$ \texttt{motor\_bridge.py}
+$\to$ \texttt{differentialantrieb.ino (erweitert)} $\to$ L298N.\\
+\textbf{Nächstes Kapitel:} Warum dieser Stack jetzt ROS2 braucht.
+\end{projektBox}
 
 \begin{merksatzBox}
-Der Raspberry Pi (oder jeder Linux-Computer) übernimmt die
-\textit{Intelligenz}: Planung, Navigation, Entscheidungen.
-Der Arduino übernimmt das \textit{Echtzeit-Timing}: PWM-Generierung,
-Encoder-Auswertung, Notabschaltung. Diese Trennung ist bewusst
-und professionell.
+Python = Intelligenz (Entscheidungslogik, Konfiguration, Logging).
+Arduino = Echtzeit (PWM, Interrupts, Motoransteuerung).
+Diese Trennung ist kein Umweg -- sie ist Systemarchitektur.
+Jede Schicht macht, was sie am besten kann.
 \end{merksatzBox}
 
 \begin{robotikBox}
-In Band 2 ersetzen wir den direkten Serial-Kanal durch einen
-ROS2-Node. Der Motor-Controller-Node subscribt auf
-\texttt{/cmd\_vel} (geometry\_msgs/Twist) und konvertiert
-Geschwindigkeitsbefehle in PWM-Werte -- dasselbe Prinzip,
-aber eingebettet in die ROS2-Infrastruktur.
+In Band~2 ersetzt \texttt{motor\_bridge.py} den direkten
+Serial-Aufruf durch:
+\begin{lstlisting}[style=python]
+cmd = Twist()
+cmd.linear.x = 0.3   # m/s vorwaerts
+self.cmd_vel_pub.publish(cmd)
+\end{lstlisting}
+Ein Arduino-seitiger ROS2-Serial-Bridge-Node
+(z.\,B. \texttt{rosserial} oder \texttt{micro\_ROS})
+übersetzt den Twist-Befehl in PWM.
+Das Prinzip -- Python schickt Befehle, Arduino führt aus --
+bleibt exakt dasselbe.
 \end{robotikBox}
