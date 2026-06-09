@@ -1,0 +1,31 @@
+# LaTeX Build-Artefakte
+*.aux
+*.log
+*.synctex.gz
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.lof
+*.lot
+*.idx
+*.ilg
+*.ind
+*.loe
+
+# PDFs (werden lokal gebaut, nicht ins Repo)
+*.pdf
+
+# Overleaf / Editor
+.DS_Store
+*.swp
+*~
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
