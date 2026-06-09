@@ -1,12 +1,67 @@
-\documentclass[11pt,a4paper,twoside]{scrbook}
+% !TeX program = lualatex
+% ============================================================
+% Band 1: Die Robotik-Werkstatt
+% Linux, Docker und Entwicklungswerkzeuge für ROS2
+%
+% Compiler: LuaLaTeX
+% Overleaf: Menu → Compiler → LuaLaTeX
+%           Menu → Main document → band1/main.tex
+% ============================================================
 
-% ── Gemeinsame Konfiguration (pdfLaTeX) ──────────────────────
-\input{../shared/preamble}
+\documentclass[
+  11pt, a4paper, oneside,
+  parskip=half, headings=normal,
+  bibliography=totoc, listof=totoc
+]{scrbook}
 
-% ── Band-spezifische Variablen ───────────────────────────────
-\newcommand{\BandTitel}{Python für Robotik und ROS2}
-\newcommand{\BandUntertitel}{Band 1: Grundlagen bis ROS2-Einstieg}
+% ── LuaLaTeX: Schriften ──────────────────────────────────────
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{microtype}
+\usepackage{hyphenat}
+\usepackage{tocbasic}
+
+% ── Layout ───────────────────────────────────────────────────
+\usepackage[left=25mm,right=25mm,top=24mm,bottom=28mm,headheight=16pt]{geometry}
+\usepackage{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{\leftmark}
+\ohead{\pagemark}
+\pagestyle{scrheadings}
+
+% ── Basis-Pakete ─────────────────────────────────────────────
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable,listings}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{listings}
+\setlist[itemize]{topsep=3pt,itemsep=2pt}
+\setlist[enumerate]{topsep=3pt,itemsep=2pt}
+
+% ── Werkstatt-Theme (Farben, Boxen, Listings) ────────────────
+\input{../shared/theme-werkstatt}
+
+% ── hyperref (nach Farbdefinitionen) ─────────────────────────
+\usepackage[colorlinks=true,
+  linkcolor=WerkstattBlau,
+  urlcolor=WerkstattBlau,
+  citecolor=WerkstattBlau]{hyperref}
+
+% ── Band-Variablen ───────────────────────────────────────────
+\newcommand{\BuchReihe}{Robotik entwickeln lernen}
+\newcommand{\BandTitel}{Die Robotik-Werkstatt}
+\newcommand{\BandUntertitel}{Linux, Docker und Entwicklungswerkzeuge für ROS2}
 \newcommand{\BandNummer}{1}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Arbeitsfassung 2026}
+\let\Werkreihe\BuchReihe
 
 % ============================================================
 \begin{document}
@@ -17,32 +72,42 @@
 % ── Titelseite (shared) ──────────────────────────────────────
 \input{../shared/titelseite}
 
-% ── Vorwort und Hinweise (band-spezifisch) ───────────────────
+% ── Vorwort (band-spezifisch) ────────────────────────────────
 \chapter*{Vorwort}
 
-Dieses Buch entstand aus einer einfachen Überzeugung: Wer einen Roboter
-programmieren will, muss Python nicht vollständig kennen -- er muss die
-richtigen Teile kennen, zur richtigen Zeit, in der richtigen Reihenfolge.
+Dieses Buch ist der Einstieg in eine Lernreihe zur Entwicklung mobiler Roboter
+und später auch von Roboterarmen. Es beginnt nicht mit ROS2, nicht mit Python
+und nicht mit komplizierter Mathematik. Es beginnt mit der Werkstatt.
 
-Der rote Faden: Ein Differentialantrieb-Roboter, der mit jedem Kapitel smarter
-wird. Am Ende des Buches fährt er autonom -- gesteuert von Python und ROS2.
+Wer Roboter entwickeln will, braucht eine Arbeitsumgebung, die zuverlässig,
+verständlich und wiederholbar ist. Genau darum geht es in diesem Band.
 
-\section*{Hinweise zur Benutzung}
+Der Ansatz ist bewusst pragmatisch. Jedes Kapitel beginnt mit einer konkreten
+Aufgabe. Aus dieser Aufgabe entsteht eine Wissenslücke. Diese Wissenslücke
+wird geschlossen. Danach wird das Problem gelöst.
 
-\textbf{Code-Listings} zeigen Python-Code mit Zeilennummern. Alle Beispiele
-sind lauffähig.
+\section*{Zwei Niveaus}
 
-\textbf{Farbige Boxen} signalisieren:
+\subsection*{Der Hauptweg}
+Der Hauptweg zeigt, wie ein konkretes Problem gelöst wird. Er ist praktisch,
+direkt und auf Umsetzung ausgelegt.
+
+\subsection*{Unter der Haube}
+Die blau markierten Vertiefungsbereiche erklären die technischen Hintergründe:
+Betriebssystemkonzepte, Architektur, Sicherheit und mathematische Denkmodelle.
+
+Der Hauptweg funktioniert auch ohne die Vertiefung.
+
+\section*{Für wen ist dieses Buch gedacht?}
+
 \begin{itemize}
-    \item \textcolor{blue!70!black}{\textbf{Merksatz}} -- das Wichtigste auf einen Blick
-    \item \textcolor{green!60!black}{\textbf{Praxisbezug}} -- direkte Robotik-Anwendung
-    \item \textcolor{orange!80!black}{\textbf{Übung}} -- selbst ausprobieren
-    \item \textcolor{purple!60!black}{\textbf{Analogie}} -- Vergleich aus dem Alltag
-    \item \textcolor{red!70!black}{\textbf{ROS2-Verbindung}} -- Brücke zu ROS2
+  \item Einsteigerinnen und Einsteiger ohne Linux-Erfahrung,
+  \item Schülerinnen und Schüler technischer Bildungsgänge,
+  \item Studierende technischer Studiengänge,
+  \item Maker und Praktiker,
+  \item Lehrkräfte, die Robotik systematisch unterrichten möchten,
+  \item alle, die später mit ROS2, Python und C++ Roboter entwickeln wollen.
 \end{itemize}
-
-\textbf{Voraussetzungen:} Grundrechenarten, Interesse an Technik. Keine
-Programmiererfahrung nötig.
 
 % ── Bandreihen-Übersicht (shared) ────────────────────────────
 \input{../shared/frontmatter}
@@ -53,26 +118,20 @@ Programmiererfahrung nötig.
 \mainmatter
 % ============================================================
 
-\input{chapters/modul01}
-\input{chapters/modul02}
-\input{chapters/modul03}
-\input{chapters/modul04}
-\input{chapters/modul05}
-\input{chapters/modul06}
-\input{chapters/modul07}
-\input{chapters/modul08}
-\input{chapters/modul09}
-\input{chapters/modul10}
-\input{chapters/modul11}
-\input{chapters/modul12}
-\input{chapters/modul13}
-\input{chapters/modul14}
-\input{chapters/modul15}
+\input{chapters/teil1_idee}
+\input{chapters/teil2}
+\input{chapters/teil3}
+\input{chapters/teil4}
+\input{chapters/teil5}
+\input{chapters/teil6}
+\input{chapters/teil7}
+\input{chapters/teil8}
+\input{chapters/teil9}
 
 % ============================================================
-\appendix
+\backmatter
 % ============================================================
 
-\input{chapters/loesungen}
+\input{chapters/anhang}
 
 \end{document}
