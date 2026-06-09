@@ -46,7 +46,6 @@
 \setlist[enumerate]{topsep=3pt,itemsep=2pt}
 
 % ── Werkstatt-Theme (Farben, Boxen, Listings) ────────────────
-% Muss vor hyperref geladen werden, da WerkstattBlau etc. darin definiert werden
 \input{../shared/theme-werkstatt}
 
 % ── hyperref (nach Farbdefinitionen) ─────────────────────────
@@ -64,13 +63,18 @@
 \newcommand{\BandVersion}{Arbeitsfassung 2026}
 \let\Werkreihe\BuchReihe
 
-% ── Dokument ─────────────────────────────────────────────────
+% ============================================================
 \begin{document}
+% ============================================================
 
 \frontmatter
-\input{chapters/titelseite}
 
+% ── Titelseite (shared) ──────────────────────────────────────
+\input{../shared/titelseite}
+
+% ── Vorwort (band-spezifisch) ────────────────────────────────
 \chapter*{Vorwort}
+
 Dieses Buch ist der Einstieg in eine Lernreihe zur Entwicklung mobiler Roboter
 und später auch von Roboterarmen. Es beginnt nicht mit ROS2, nicht mit Python
 und nicht mit komplizierter Mathematik. Es beginnt mit der Werkstatt.
@@ -78,15 +82,42 @@ und nicht mit komplizierter Mathematik. Es beginnt mit der Werkstatt.
 Wer Roboter entwickeln will, braucht eine Arbeitsumgebung, die zuverlässig,
 verständlich und wiederholbar ist. Genau darum geht es in diesem Band.
 
-% Didaktisches Konzept und Zielgruppe (Band-0-spezifisch)
-\input{chapters/frontmatter}
+Der Ansatz ist bewusst pragmatisch. Jedes Kapitel beginnt mit einer konkreten
+Aufgabe. Aus dieser Aufgabe entsteht eine Wissenslücke. Diese Wissenslücke
+wird geschlossen. Danach wird das Problem gelöst.
 
-% Serienübergreifende Bandreihen-Übersicht
+\section*{Zwei Niveaus}
+
+\subsection*{Der Hauptweg}
+Der Hauptweg zeigt, wie ein konkretes Problem gelöst wird. Er ist praktisch,
+direkt und auf Umsetzung ausgelegt.
+
+\subsection*{Unter der Haube}
+Die blau markierten Vertiefungsbereiche erklären die technischen Hintergründe:
+Betriebssystemkonzepte, Architektur, Sicherheit und mathematische Denkmodelle.
+
+Der Hauptweg funktioniert auch ohne die Vertiefung.
+
+\section*{Für wen ist dieses Buch gedacht?}
+
+\begin{itemize}
+  \item Einsteigerinnen und Einsteiger ohne Linux-Erfahrung,
+  \item Schülerinnen und Schüler technischer Bildungsgänge,
+  \item Studierende technischer Studiengänge,
+  \item Maker und Praktiker,
+  \item Lehrkräfte, die Robotik systematisch unterrichten möchten,
+  \item alle, die später mit ROS2, Python und C++ Roboter entwickeln wollen.
+\end{itemize}
+
+% ── Bandreihen-Übersicht (shared) ────────────────────────────
 \input{../shared/frontmatter}
 
 \tableofcontents
 
+% ============================================================
 \mainmatter
+% ============================================================
+
 \input{chapters/teil1_idee}
 \input{chapters/teil2}
 \input{chapters/teil3}
@@ -97,7 +128,10 @@ verständlich und wiederholbar ist. Genau darum geht es in diesem Band.
 \input{chapters/teil8}
 \input{chapters/teil9}
 
+% ============================================================
 \backmatter
+% ============================================================
+
 \input{chapters/anhang}
 
 \end{document}
