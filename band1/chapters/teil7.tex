@@ -5,30 +5,199 @@
 \chapter{Wir wollen zwei Programme miteinander sprechen lassen}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du verstehst, wie Linux-Prozesse miteinander kommunizieren können
+und kennst die grundlegenden IPC-Mechanismen.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Dein Sensor-Programm liest Werte, dein Navigations-Programm
+braucht diese Werte -- aber sie laufen in getrennten Prozessen.
+Wie kommen die Daten von A nach B?
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Lass zwei Python-Programme über eine Pipe miteinander
+kommunizieren.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{problemBox}
+Prozesse haben getrennte Speicherbereiche. Sie können nicht
+einfach Variablen teilen. Kommunikation braucht explizite Kanäle.
+\end{problemBox}
 
+\begin{wissenBox}
+Wir brauchen: Pipes, Named Pipes (FIFOs), Sockets und den
+Unterschied zwischen synchroner und asynchroner Kommunikation.
+\end{wissenBox}
+
+\section{Pipes -- der einfachste Weg}
+
+\begin{lstlisting}[style=bash]
+# Unix-Pipe: Ausgabe von Programm A als Eingabe von Programm B
+python3 sensor_ausgabe.py | python3 navigation_eingabe.py
+
+# Named Pipe (FIFO) -- persistenter Kanal
+mkfifo /tmp/sensor_kanal
+
+# Terminal 1: Daten senden
+python3 -c "
+import time
+with open('/tmp/sensor_kanal', 'w') as f:
+    for i in range(10):
+        f.write(f'{i * 0.1:.2f}\n')
+        f.flush()
+        time.sleep(0.5)
+"
+
+# Terminal 2: Daten empfangen
+python3 -c "
+with open('/tmp/sensor_kanal', 'r') as f:
+    for line in f:
+        print(f'Empfangen: {line.strip()}')
+"
+\end{lstlisting}
+
+\section{Sockets -- netzwerkfähige Kommunikation}
+
+\begin{lstlisting}[style=python]
+# sensor_server.py -- Sensorwerte senden
+import socket, time, random
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind(('localhost', 9000))
+server.listen(1)
+print("Warte auf Verbindung...")
+conn, addr = server.accept()
+
+while True:
+    wert = round(random.uniform(0.1, 2.0), 2)
+    conn.send(f"{wert}\n".encode())
+    time.sleep(0.5)
+\end{lstlisting}
+
+\begin{lstlisting}[style=python]
+# navigations_client.py -- Sensorwerte empfangen
+import socket
+
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client.connect(('localhost', 9000))
+
+while True:
+    daten = client.recv(1024).decode().strip()
+    abstand = float(daten)
+    if abstand < 0.25:
+        print(f"WARNUNG: Hindernis bei {abstand} m")
+    else:
+        print(f"Frei: {abstand} m")
+\end{lstlisting}
+
+\begin{loesungBox}
+Für einfache Kommunikation auf demselben Rechner: Named Pipe.
+Für netzwerkfähige Kommunikation (Roboter ↔ Laptop): Socket.
+Für komplexe Systeme mit vielen Teilnehmern: ROS2 Topics.
+\end{loesungBox}
+
+\begin{merksatzBox}
+IPC (Inter-Process Communication) ist das Fundament vernetzter
+Systeme. Pipes sind einfach, aber eingeschränkt. Sockets sind
+flexibel und netzwerkfähig. ROS2 baut auf DDS auf -- einem
+industriellen Nachrichtenprotokoll, das Sockets weit übertrifft.
+\end{merksatzBox}
+
+\begin{robotikBox}
+ROS2's DDS-Middleware ist ein hochentwickeltes IPC-System:
+Topics sind Named Pipes, die automatisch entdeckt werden
+(\textit{Discovery}), mit Typsicherheit und Quality-of-Service-Garantien.
+Der Schritt von Socket zu ROS2-Topic ist konzeptionell klein.
+\end{robotikBox}
+
+% ── Kapitel 22 ────────────────────────────────────────────────
 \chapter{Wir wollen Nachrichten statt direkter Befehle senden}
 
 \kapitelziel{
-Dieses Kapitel wird nach dem Werkstatt-Schema ausgearbeitet.
+Du verstehst das Publish-Subscribe-Muster und kannst es
+in Python implementieren -- als Vorbereitung für ROS2-Topics.
 }
-
 \kapitelstruktur
 
+\section{Situation}
+Sensor, Navigation und Anzeige sollen alle Abstandswerte bekommen.
+Mit direkten Verbindungen (A→B, A→C) wird der Code zu einem
+Geflecht von Abhängigkeiten.
+
 \begin{aufgabeBox}
-Aufgabe folgt.
+Implementiere ein einfaches Publish-Subscribe-System, bei dem
+ein Sender Daten veröffentlicht und mehrere Empfänger diese
+unabhängig voneinander erhalten.
 \end{aufgabeBox}
 
-% TODO: Situation, Problem, Wissen, Lösung, Merksatz,
-%       Fehler, Übungen, Quiz, Haube, Robotik-Transfer
+\begin{analogie}
+Publish-Subscribe ist wie ein Radiosender: Der Sender (Publisher)
+sendet ins Leere. Wer zuhören will (Subscriber), schaltet ein.
+Der Sender kümmert sich nicht darum, wie viele zuhören.
+\end{analogie}
 
+\begin{lstlisting}[style=python]
+# pubsub.py -- Minimales Publish-Subscribe in Python
+import threading, time, random
+from collections import defaultdict
+
+class MessageBus:
+    """Einfacher Message-Bus: Publish-Subscribe."""
+    def __init__(self):
+        self._subscribers = defaultdict(list)
+
+    def subscribe(self, topic, callback):
+        self._subscribers[topic].append(callback)
+
+    def publish(self, topic, message):
+        for cb in self._subscribers[topic]:
+            cb(message)
+
+# Bus-Instanz (geteilt zwischen allen)
+bus = MessageBus()
+
+# Subscriber-Callbacks
+def navigation_callback(msg):
+    abstand = msg['abstand']
+    if abstand < 0.25:
+        print(f"  Navigation: STOPP (Abstand: {abstand} m)")
+
+def anzeige_callback(msg):
+    print(f"  Anzeige: Abstand = {msg['abstand']:.2f} m")
+
+# Registrieren
+bus.subscribe('/sensor/abstand', navigation_callback)
+bus.subscribe('/sensor/abstand', anzeige_callback)
+
+# Publisher (Sensor) in eigenem Thread
+def sensor_publisher():
+    while True:
+        wert = round(random.uniform(0.1, 2.0), 2)
+        bus.publish('/sensor/abstand', {'abstand': wert, 'zeit': time.time()})
+        time.sleep(1.0)
+
+t = threading.Thread(target=sensor_publisher, daemon=True)
+t.start()
+time.sleep(5)
+\end{lstlisting}
+
+\begin{merksatzBox}
+Publisher kennen ihre Subscriber nicht. Subscriber kennen ihren
+Publisher nicht. Beide kennen nur den Topic-Namen. Diese
+\textit{lose Kopplung} macht das System flexibel -- neue Subscriber
+können jederzeit hinzukommen, ohne Publisher zu ändern.
+\end{merksatzBox}
+
+\begin{robotikBox}
+Dieser Code ist strukturell identisch mit ROS2:
+\begin{lstlisting}[style=python]
+# ROS2-Equivalent:
+self.publisher = self.create_publisher(Float32, '/sensor/abstand', 10)
+self.subscription = self.create_subscription(
+    Float32, '/sensor/abstand', self.navigation_callback, 10)
+\end{lstlisting}
+Das Konzept -- Publish-Subscribe über benannte Topics --
+ist exakt dasselbe. ROS2 fügt Netzwerkfähigkeit,
+Typsicherheit und Discovery hinzu.
+\end{robotikBox}
