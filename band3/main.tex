@@ -1,0 +1,30 @@
+\documentclass[11pt,a4paper,twoside]{scrbook}
+
+% ── Gemeinsame Konfiguration aller Bände ────────────────────
+\input{../shared/preamble}
+
+% ── Band-spezifische Variablen ───────────────────────────────
+\newcommand{\BuchReihe}{Python für Robotik und ROS2}
+\newcommand{\BandTitel}{Embedded AI: OpenCV, YOLO, Edge-Deployment}
+\newcommand{\BandUntertitel}{Band 3}
+\newcommand{\BandNummer}{3}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Version 0.1 -- in Planung}
+
+% ── Dokument ────────────────────────────────────────────────
+\begin{document}
+
+\frontmatter
+\input{../shared/titelseite}
+\tableofcontents
+
+\mainmatter
+\input{chapters/frontmatter}
+% Weitere Kapitel werden hier eingebunden:
+% \input{chapters/modul01}
+% ...
+
+\appendix
+% \input{chapters/loesungen}
+
+\end{document}
