@@ -1,30 +1,31 @@
-\documentclass[11pt,a4paper,twoside]{scrbook}
+\documentclass[
+  11pt,
+  twoside,
+  parskip=half, headings=normal,
+  bibliography=totoc, listof=totoc
+]{scrbook}
 
-% ── Gemeinsame Konfiguration aller Bände ────────────────────
+% Gemeinsame Konfiguration (pdfLaTeX, KDP-Format)
 \input{../shared/preamble}
 
-% ── Band-spezifische Variablen ───────────────────────────────
-\newcommand{\BuchReihe}{Python für Robotik und ROS2}
-\newcommand{\BandTitel}{ROS2 vertieft: Navigation, Sensorfusion, Docker}
-\newcommand{\BandUntertitel}{Band 3}
+% Band-spezifische Variablen
+\newcommand{\BandTitel}{ROS2 vertieft}
+\newcommand{\BandUntertitel}{Navigation, Sensorfusion und Docker}
 \newcommand{\BandNummer}{3}
-\newcommand{\BandAutor}{Wolfgang Becker}
-\newcommand{\BandVersion}{Version 0.1 -- in Planung}
 
-% ── Dokument ────────────────────────────────────────────────
 \begin{document}
 
 \frontmatter
 \input{../shared/titelseite}
+
+\chapter*{Vorwort}
+Dieser Band ist in Vorbereitung.
+
+\input{../shared/frontmatter}
 \tableofcontents
 
 \mainmatter
 \input{chapters/frontmatter}
-% Weitere Kapitel werden hier eingebunden:
-% \input{chapters/modul01}
-% ...
 
-\appendix
-% \input{chapters/loesungen}
-
+\backmatter
 \end{document}
