@@ -3,34 +3,53 @@
 % Band 1: Die Robotik-Werkstatt
 % Linux, Docker und Entwicklungswerkzeuge für ROS2
 %
-% Compiler: LuaLaTeX
-% Overleaf: Menu → Compiler → LuaLaTeX
-%           Menu → Main document → band1/main.tex
+% Druckformat: Amazon KDP — 6,69 × 9,61 Zoll (17,0 × 24,4 cm)
+% Compiler:    LuaLaTeX
+% Overleaf:    Menu → Compiler → LuaLaTeX
+%              Menu → Main document → band1/main.tex
 % ============================================================
 
 \documentclass[
-  11pt, a4paper, oneside,
-  parskip=half, headings=normal,
-  bibliography=totoc, listof=totoc
+  11pt,
+  twoside,           % Buchdruck: Bund-Steg wechselt je Seite
+  parskip=half,
+  headings=normal,
+  bibliography=totoc,
+  listof=totoc
 ]{scrbook}
+
+% ── KDP-Seitenformat ─────────────────────────────────────────
+% 6,69 × 9,61 Zoll = 169,9 × 244,1 mm
+% Innensteg 23 mm (Mindest-KDP für 151–400 Seiten: 19 mm)
+% Außensteg 18 mm, oben 18 mm, unten 22 mm
+\usepackage[
+  paperwidth  = 6.69in,
+  paperheight = 9.61in,
+  inner       = 23mm,   % Bund (innen, für Bindung)
+  outer       = 18mm,   % Außensteg
+  top         = 18mm,   % Oberer Rand (exkl. Kopfzeile)
+  bottom      = 22mm,   % Unterer Rand
+  headheight  = 14pt,
+  headsep     = 8mm,
+  footskip    = 10mm
+]{geometry}
 
 % ── LuaLaTeX: Schriften ──────────────────────────────────────
 \usepackage{fontspec}
 \setmainfont{Latin Modern Roman}
 \setsansfont{Latin Modern Sans}
-\setmonofont{Latin Modern Mono}
+\setmonofont[AutoFakeBold=1.5]{Latin Modern Mono}
 \usepackage[ngerman]{babel}
 \usepackage{csquotes}
 \usepackage{microtype}
 \usepackage{hyphenat}
 \usepackage{tocbasic}
 
-% ── Layout ───────────────────────────────────────────────────
-\usepackage[left=25mm,right=25mm,top=24mm,bottom=28mm,headheight=16pt]{geometry}
+% ── Kopf- und Fußzeilen ──────────────────────────────────────
 \usepackage{scrlayer-scrpage}
 \clearpairofpagestyles
-\ihead{\leftmark}
-\ohead{\pagemark}
+\ihead{\small\leftmark}
+\ohead{\small\pagemark}
 \pagestyle{scrheadings}
 
 % ── Basis-Pakete ─────────────────────────────────────────────
@@ -48,11 +67,17 @@
 % ── Werkstatt-Theme (Farben, Boxen, Listings) ────────────────
 \input{../shared/theme-werkstatt}
 
-% ── hyperref (nach Farbdefinitionen) ─────────────────────────
-\usepackage[colorlinks=true,
-  linkcolor=WerkstattBlau,
-  urlcolor=WerkstattBlau,
-  citecolor=WerkstattBlau]{hyperref}
+% ── hyperref: für Druck neutrale Farben ──────────────────────
+\usepackage[
+  colorlinks  = true,
+  linkcolor   = black,
+  urlcolor    = black,
+  citecolor   = black,
+  pdfauthor   = {Wolfgang Becker},
+  pdftitle    = {Die Robotik-Werkstatt},
+  pdfsubject  = {Linux, Docker und Entwicklungswerkzeuge für ROS2},
+  pdfkeywords = {Robotik, Linux, Docker, ROS2, Arduino}
+]{hyperref}
 
 % ── Band-Variablen ───────────────────────────────────────────
 \newcommand{\BuchReihe}{Robotik entwickeln lernen}
@@ -60,58 +85,59 @@
 \newcommand{\BandUntertitel}{Linux, Docker und Entwicklungswerkzeuge für ROS2}
 \newcommand{\BandNummer}{1}
 \newcommand{\BandAutor}{Wolfgang Becker}
-\newcommand{\BandVersion}{Arbeitsfassung 2026}
+\newcommand{\BandVersion}{Erste Auflage}
 \let\Werkreihe\BuchReihe
+
+% ── TOC: Breite für Part-Nummern anpassen ────────────────────
+\DeclareTOCStyleEntry[numberwidth=3em]{tocline}{part}
 
 % ============================================================
 \begin{document}
 % ============================================================
 
 \frontmatter
-
-% ── Titelseite (shared) ──────────────────────────────────────
 \input{../shared/titelseite}
 
-% ── Vorwort (band-spezifisch) ────────────────────────────────
 \chapter*{Vorwort}
 
-Dieses Buch ist der Einstieg in eine Lernreihe zur Entwicklung mobiler Roboter
-und später auch von Roboterarmen. Es beginnt nicht mit ROS2, nicht mit Python
-und nicht mit komplizierter Mathematik. Es beginnt mit der Werkstatt.
+Dieses Buch ist der Einstieg in eine Lernreihe zur Entwicklung
+mobiler Roboter und später auch von Roboterarmen. Es beginnt
+nicht mit ROS2, nicht mit Python und nicht mit komplizierter
+Mathematik. Es beginnt mit der Werkstatt.
 
-Wer Roboter entwickeln will, braucht eine Arbeitsumgebung, die zuverlässig,
-verständlich und wiederholbar ist. Genau darum geht es in diesem Band.
+Wer Roboter entwickeln will, braucht eine Arbeitsumgebung,
+die zuverlässig, verständlich und wiederholbar ist.
+Genau darum geht es in diesem Band.
 
-Der Ansatz ist bewusst pragmatisch. Jedes Kapitel beginnt mit einer konkreten
-Aufgabe. Aus dieser Aufgabe entsteht eine Wissenslücke. Diese Wissenslücke
-wird geschlossen. Danach wird das Problem gelöst.
+Der Ansatz ist bewusst pragmatisch. Jedes Kapitel beginnt
+mit einer konkreten Aufgabe. Aus dieser Aufgabe entsteht
+eine Wissenslücke. Diese Wissenslücke wird geschlossen.
+Danach wird das Problem gelöst.
 
 \section*{Zwei Niveaus}
 
 \subsection*{Der Hauptweg}
-Der Hauptweg zeigt, wie ein konkretes Problem gelöst wird. Er ist praktisch,
-direkt und auf Umsetzung ausgelegt.
+Der Hauptweg zeigt, wie ein konkretes Problem gelöst wird.
+Er ist praktisch, direkt und auf Umsetzung ausgelegt.
 
 \subsection*{Unter der Haube}
-Die blau markierten Vertiefungsbereiche erklären die technischen Hintergründe:
-Betriebssystemkonzepte, Architektur, Sicherheit und mathematische Denkmodelle.
-
+Die blau markierten Vertiefungsbereiche erklären die
+technischen Hintergründe: Betriebssystemkonzepte, Architektur,
+Sicherheit und mathematische Denkmodelle.
 Der Hauptweg funktioniert auch ohne die Vertiefung.
 
 \section*{Für wen ist dieses Buch gedacht?}
 
 \begin{itemize}
-  \item Einsteigerinnen und Einsteiger ohne Linux-Erfahrung,
-  \item Schülerinnen und Schüler technischer Bildungsgänge,
-  \item Studierende technischer Studiengänge,
-  \item Maker und Praktiker,
-  \item Lehrkräfte, die Robotik systematisch unterrichten möchten,
-  \item alle, die später mit ROS2, Python und C++ Roboter entwickeln wollen.
+  \item Einsteigerinnen und Einsteiger ohne Linux-Erfahrung
+  \item Schülerinnen und Schüler technischer Bildungsgänge
+  \item Studierende technischer Studiengänge
+  \item Maker und Praktiker
+  \item Lehrkräfte, die Robotik systematisch unterrichten möchten
+  \item alle, die später mit ROS2, Python und C++ Roboter entwickeln wollen
 \end{itemize}
 
-% ── Bandreihen-Übersicht (shared) ────────────────────────────
 \input{../shared/frontmatter}
-
 \tableofcontents
 
 % ============================================================
