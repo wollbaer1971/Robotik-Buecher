@@ -163,4 +163,26 @@
   morekeywords     = {FROM,RUN,CMD,COPY,WORKDIR,ENV,EXPOSE,LABEL,ARG,USER}
 }
 
+
+\lstdefinestyle{json}{
+  backgroundcolor  = \color{CodeHintergrund},
+  basicstyle       = \ttfamily\footnotesize,
+  breaklines       = true,
+  breakatwhitespace= false,
+  showstringspaces = false,
+  frame            = single,
+  framesep         = 3pt,
+  rulecolor        = \color{WerkstattDunkelgrau},
+  numbers          = none,
+  xleftmargin      = 8pt,
+  xrightmargin     = 4pt,
+  morestring       = [b]",
+  stringstyle      = \color{WerkstattGruen},
+  morecomment      = [l]{//},
+  commentstyle     = \color{gray}\itshape,
+  literate         =
+    {ä}{{\"{a}}}1 {ö}{{\"{o}}}1 {ü}{{\"{u}}}1
+    {Ä}{{\"{A}}}1 {Ö}{{\"{O}}}1 {Ü}{{\"{U}}}1
+    {ß}{{\ss}}1
+}
 \lstset{style=werkstattcode}
