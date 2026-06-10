@@ -1,124 +1,166 @@
 % ============================================================
 % shared/theme-werkstatt.tex
-% Visuelles Theme für die Werkstatt-Serie (Band 0 und ggf. Folgebände)
-% Voraussetzung: xcolor, tcolorbox (most), listings geladen
+% Werkstatt-Theme: Farben, Boxen, Listings für Band 1 (LuaLaTeX)
 % ============================================================
 
-% ── Farben ──────────────────────────────────────────────────
-\definecolor{WerkstattBlau}{HTML}{1F5F8B}
-\definecolor{WerkstattHellblau}{HTML}{EAF4FA}
+% ── Farben ───────────────────────────────────────────────────
+\definecolor{WerkstattBlau}{HTML}{1565C0}
+\definecolor{WerkstattHellblau}{HTML}{E3F2FD}
+\definecolor{WerkstattGrau}{HTML}{F5F5F5}
+\definecolor{WerkstattDunkelgrau}{HTML}{424242}
 \definecolor{WerkstattGruen}{HTML}{2E7D32}
-\definecolor{WerkstattHellgruen}{HTML}{EEF7EF}
-\definecolor{WerkstattOrange}{HTML}{C96A00}
-\definecolor{WerkstattHellorange}{HTML}{FFF3E3}
-\definecolor{WerkstattGrau}{HTML}{F3F4F6}
-\definecolor{WerkstattDunkelgrau}{HTML}{444444}
-\definecolor{CodeHintergrund}{HTML}{F7F7F7}
-
-% ── Basis-Einstellungen für alle Boxen ──────────────────────
-\tcbset{
-  enhanced, breakable,
-  boxrule=0.6pt, arc=2mm,
-  left=3mm, right=3mm, top=2mm, bottom=2mm,
-  before skip=8pt, after skip=8pt
-}
-
-% ── Didaktische Boxen ────────────────────────────────────────
-\newtcolorbox{aufgabeBox}{
-  colback=WerkstattHellorange, colframe=WerkstattOrange,
-  fonttitle=\sffamily\bfseries, title=Die Aufgabe}
-
-\newtcolorbox{problemBox}{
-  colback=WerkstattGrau, colframe=WerkstattDunkelgrau,
-  fonttitle=\sffamily\bfseries, title=Warum es nicht sofort klappt}
-
-\newtcolorbox{wissenBox}{
-  colback=WerkstattHellblau, colframe=WerkstattBlau,
-  fonttitle=\sffamily\bfseries, title=Was wir dafür lernen müssen}
-
-\newtcolorbox{loesungBox}{
-  colback=white, colframe=WerkstattGruen,
-  fonttitle=\sffamily\bfseries, title=Schritt-für-Schritt-Lösung}
-
-\newtcolorbox{merksatzBox}{
-  colback=WerkstattHellgruen, colframe=WerkstattGruen,
-  fonttitle=\sffamily\bfseries, title=Merksatz}
-
-\newtcolorbox{fehlerBox}{
-  colback=red!4, colframe=red!55!black,
-  fonttitle=\sffamily\bfseries, title=Typische Fehler}
-
-\newtcolorbox{uebungBox}{
-  colback=white, colframe=WerkstattBlau,
-  fonttitle=\sffamily\bfseries, title=Übungen}
-
-\newtcolorbox{quizBox}{
-  colback=WerkstattGrau, colframe=WerkstattBlau,
-  fonttitle=\sffamily\bfseries, title=Mini-Quiz}
-
-\newtcolorbox{haubeBox}{
-  colback=WerkstattHellblau, colframe=WerkstattBlau,
-  fonttitle=\sffamily\bfseries, title=Unter der Haube,
-  borderline west={2mm}{0pt}{WerkstattBlau}}
-
-\newtcolorbox{robotikBox}{
-  colback=WerkstattHellgruen, colframe=WerkstattGruen,
-  fonttitle=\sffamily\bfseries,
-  title=Transfer zur Robotik und zu ROS2,
-  borderline west={2mm}{0pt}{WerkstattGruen}}
-
-% ── Code-Stile ───────────────────────────────────────────────
-\lstdefinestyle{werkstattcode}{
-  backgroundcolor=\color{CodeHintergrund},
-  basicstyle=\ttfamily\small,
-  breaklines=true,
-  columns=fullflexible,
-  frame=single,
-  rulecolor=\color{WerkstattDunkelgrau},
-  framerule=0.3pt,
-  xleftmargin=2mm, xrightmargin=2mm,
-  aboveskip=8pt, belowskip=8pt,
-  showstringspaces=false,
-  extendedchars=true
-}
-\lstdefinestyle{bash}{style=werkstattcode, language=bash}
-\lstdefinestyle{python}{style=werkstattcode, language=Python}
-\lstdefinestyle{text}{style=werkstattcode}
-\lstdefinestyle{dockerfile}{style=werkstattcode}
-\lstdefinestyle{yaml}{style=werkstattcode}
-
-% ── Kapitel-Makros ───────────────────────────────────────────
-\newtcolorbox{analogie}[1][]{
-  colback=WerkstattHellblau,
-  colframe=WerkstattBlau,
-  fonttitle=\sffamily\bfseries,
-  title=Analogie,#1}
-
+\definecolor{WerkstattHellgruen}{HTML}{E8F5E9}
+\definecolor{WerkstattOrange}{HTML}{E65100}
+\definecolor{WerkstattHellorange}{HTML}{FFF3E0}
+\definecolor{WerkstattRot}{HTML}{B71C1C}
+\definecolor{WerkstattHellrot}{HTML}{FFEBEE}
+\definecolor{WerkstattLila}{HTML}{4A148C}
+\definecolor{WerkstattHellila}{HTML}{F3E5F5}
+\definecolor{WerkstattGold}{HTML}{F57F17}
+\definecolor{WerkstattHellgold}{HTML}{FFFDE7}
+\definecolor{CodeHintergrund}{HTML}{F8F8F8}
 \definecolor{ProjektFarbe}{HTML}{E8F5E9}
 \definecolor{ProjektRahmen}{HTML}{2E7D32}
 
-\newtcolorbox{projektBox}{
+% ── Boxen ────────────────────────────────────────────────────
+\newtcolorbox{aufgabeBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellgold, colframe=WerkstattGold,
+  fonttitle=\sffamily\bfseries, title=Aufgabe, #1}
+
+\newtcolorbox{problemBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellrot, colframe=WerkstattRot,
+  fonttitle=\sffamily\bfseries, title=Das Problem, #1}
+
+\newtcolorbox{wissenBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellblau, colframe=WerkstattBlau,
+  fonttitle=\sffamily\bfseries, title=Was wir dafür brauchen, #1}
+
+\newtcolorbox{loesungBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellgruen, colframe=WerkstattGruen,
+  fonttitle=\sffamily\bfseries, title=Schritt-für-Schritt-Lösung, #1}
+
+\newtcolorbox{merksatzBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellblau, colframe=WerkstattBlau,
+  fonttitle=\sffamily\bfseries, title=Merksatz, #1}
+
+\newtcolorbox{fehlerBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellrot, colframe=WerkstattRot,
+  fonttitle=\sffamily\bfseries, title=Typische Fehler, #1}
+
+\newtcolorbox{uebungBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellorange, colframe=WerkstattOrange,
+  fonttitle=\sffamily\bfseries, title=Übungen, #1}
+
+\newtcolorbox{quizBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellila, colframe=WerkstattLila,
+  fonttitle=\sffamily\bfseries, title=Mini-Quiz, #1}
+
+\newtcolorbox{haubeBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellblau, colframe=WerkstattBlau,
+  fonttitle=\sffamily\bfseries, title=Unter der Haube, #1}
+
+\newtcolorbox{robotikBox}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellgruen, colframe=WerkstattGruen,
+  fonttitle=\sffamily\bfseries, title=Transfer zur Robotik und ROS2, #1}
+
+\newtcolorbox{analogie}[1][]{
+  enhanced, breakable,
+  colback=WerkstattHellblau, colframe=WerkstattBlau,
+  fonttitle=\sffamily\bfseries, title=Analogie, #1}
+
+\newtcolorbox{projektBox}[1][]{
   enhanced, breakable,
   colback=ProjektFarbe, colframe=ProjektRahmen,
   boxrule=1pt,
   fonttitle=\sffamily\bfseries,
-  title={\texttt{robotik-uno-q} -- Projektstand}}
+  title={\texttt{robotik-uno-q} -- Projektstand}, #1}
 
+% ── Kapitel-Makros ───────────────────────────────────────────
 \newcommand{\kapitelziel}[1]{%
   \begin{tcolorbox}[
-    colback=white, colframe=WerkstattBlau,
-    fonttitle=\sffamily\bfseries, title=Kapitelziel]
+    colback=WerkstattGrau, colframe=WerkstattDunkelgrau,
+    fonttitle=\sffamily\bfseries, title=Lernziele]
   #1
-  \end{tcolorbox}}
+  \end{tcolorbox}\vspace{4mm}}
 
 \newcommand{\kapitelstruktur}{%
-  \section*{Arbeitsweise in diesem Kapitel}
-  Jedes Kapitel folgt demselben Muster:
-  \begin{enumerate}
-    \item Wir starten mit einer konkreten Aufgabe.
-    \item Wir prüfen, warum die Aufgabe nicht sofort lösbar ist.
-    \item Wir klären, welches Wissen fehlt.
-    \item Wir erarbeiten genau dieses Wissen.
-    \item Wir lösen die Aufgabe Schritt für Schritt.
-    \item Wir übertragen das Gelernte auf Robotik und ROS2.
-  \end{enumerate}}
+  \begin{tcolorbox}[
+    colback=WerkstattGrau, colframe=WerkstattDunkelgrau,
+    fonttitle=\sffamily\bfseries,
+    title=Aufbau dieses Kapitels (Werkstatt-Schema)]
+  \small
+  Situation \(\to\) Aufgabe \(\to\) Erster Versuch \(\to\) Problem
+  \(\to\) Was wir brauchen \(\to\) Der pragmatische Weg
+  \(\to\) Schritt-für-Schritt \(\to\) Ergebnis prüfen
+  \(\to\) Merksatz \(\to\) Typische Fehler \(\to\) Übungen
+  \(\to\) Quiz \(\to\) Unter der Haube \(\to\) Transfer
+  \end{tcolorbox}\vspace{2mm}}
+
+% ── Listings ─────────────────────────────────────────────────
+% footnotesize für KDP-Satzbreite 128,9 mm (~72 Zeichen/Zeile)
+\lstdefinestyle{werkstattcode}{
+  backgroundcolor  = \color{CodeHintergrund},
+  basicstyle       = \ttfamily\footnotesize,
+  breaklines       = true,
+  breakatwhitespace= false,
+  showstringspaces = false,
+  frame            = single,
+  framesep         = 3pt,
+  rulecolor        = \color{WerkstattDunkelgrau},
+  numbers          = left,
+  numberstyle      = \tiny\color{gray},
+  numbersep        = 5pt,
+  xleftmargin      = 8pt,
+  xrightmargin     = 4pt,
+  literate         =
+    {ä}{{\"{a}}}1 {ö}{{\"{o}}}1 {ü}{{\"{u}}}1
+    {Ä}{{\"{A}}}1 {Ö}{{\"{O}}}1 {Ü}{{\"{U}}}1
+    {ß}{{\ss}}1
+}
+
+\lstdefinestyle{bash}{
+  style            = werkstattcode,
+  keywordstyle     = \color{WerkstattGruen},
+  commentstyle     = \color{gray}\itshape,
+  morecomment      = [l]{\#}
+}
+
+\lstdefinestyle{python}{
+  style            = werkstattcode,
+  language         = Python,
+  keywordstyle     = \color{WerkstattBlau},
+  stringstyle      = \color{WerkstattGruen},
+  commentstyle     = \color{gray}\itshape
+}
+
+\lstdefinestyle{yaml}{
+  style            = werkstattcode,
+  keywordstyle     = \color{WerkstattBlau},
+  commentstyle     = \color{gray}\itshape,
+  morecomment      = [l]{\#}
+}
+
+\lstdefinestyle{text}{
+  style            = werkstattcode,
+  numbers          = none,
+  frame            = none,
+  backgroundcolor  = \color{white}
+}
+
+\lstdefinestyle{dockerfile}{
+  style            = werkstattcode,
+  keywordstyle     = \color{WerkstattBlau}\bfseries,
+  morekeywords     = {FROM,RUN,CMD,COPY,WORKDIR,ENV,EXPOSE,LABEL,ARG,USER}
+}
+
+\lstset{style=werkstattcode}
