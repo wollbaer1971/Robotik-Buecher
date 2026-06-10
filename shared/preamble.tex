@@ -1,111 +1,138 @@
 % ============================================================
 % shared/preamble.tex
 % Zentrale Konfiguration für pdfLaTeX-Bände (Band 2–4)
-% NICHT für Band 1 (LuaLaTeX) verwenden -- siehe band1/main.tex
+% NICHT für Band 1 (LuaLaTeX) verwenden — siehe band1/main.tex
+%
+% Druckformat: Amazon KDP — 6,69 × 9,61 Zoll (17,0 × 24,4 cm)
+% Compiler:    pdfLaTeX
+% Einbinden:   \input{../shared/preamble} in band2–4/main.tex
 % ============================================================
-% Einbinden: \input{../shared/preamble} in band2/main.tex, band3/main.tex, band4/main.tex
-% ============================================================
 
-% ── Buchreihe-Variablen (für shared/titelseite.tex kompatibel) ────
-────────────────────────────────────────
-\newcommand{\BuchReihe}{Robotik entwickeln lernen}
-\newcommand{\BandAutor}{Wolfgang Becker}
-\newcommand{\BandVersion}{Arbeitsfassung 2026}
+% ── KDP-Seitenformat ─────────────────────────────────────────
+\usepackage[
+  paperwidth  = 6.69in,
+  paperheight = 9.61in,
+  inner       = 23mm,
+  outer       = 18mm,
+  top         = 18mm,
+  bottom      = 22mm,
+  headheight  = 14pt,
+  headsep     = 8mm,
+  footskip    = 10mm
+]{geometry}
 
-
-% ── Sprache & Schrift ────────────────────────────────────────
-\usepackage[ngerman]{babel}
+% ── pdfLaTeX: Schriften und Kodierung ────────────────────────
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+\usepackage[utf8]{inputenc}
+\usepackage[ngerman]{babel}
+\usepackage{csquotes}
+\usepackage{microtype}
 
-% ── Layout ──────────────────────────────────────────────────
-\usepackage{geometry}
-\geometry{left=28mm,right=22mm,top=25mm,bottom=30mm}
+% ── Kopf- und Fußzeilen ──────────────────────────────────────
 \usepackage{scrlayer-scrpage}
-\KOMAoptions{headsepline=true}
-\pagestyle{scrheadings}
 \clearpairofpagestyles
-\lehead{\leftmark}
-\rohead{\BuchReihe}   % wird in band*/main.tex gesetzt
-\cfoot{\thepage}
+\ihead{\small\leftmark}
+\ohead{\small\pagemark}
+\pagestyle{scrheadings}
 
-% ── Pakete ──────────────────────────────────────────────────
+% ── Basis-Pakete ─────────────────────────────────────────────
 \usepackage{xcolor}
-\usepackage{tcolorbox}
+\usepackage[most]{tcolorbox}
 \tcbuselibrary{skins,breakable,listings}
-\usepackage{enumitem}
-\usepackage{hyperref}
-\usepackage{listings}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{textcomp}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{hyperref}
 
-\hypersetup{colorlinks=true,linkcolor=blue!60!black,urlcolor=teal}
+\setlist[itemize]{topsep=3pt,itemsep=2pt}
+\setlist[enumerate]{topsep=3pt,itemsep=2pt}
 
-% ── Farben ──────────────────────────────────────────────────
-\definecolor{MerksatzFarbe}{HTML}{DDEEFF}
-\definecolor{UebungFarbe}{HTML}{FFF3CC}
-\definecolor{PraxisFarbe}{HTML}{E8F5E9}
-\definecolor{TippFarbe}{HTML}{FFF8E1}
-\definecolor{RosFarbe}{HTML}{FCE4EC}
-\definecolor{AnalogieFarbe}{HTML}{EDE7F6}
-\definecolor{LoesungFarbe}{HTML}{F3E5F5}
-\definecolor{CodeHintergrund}{HTML}{F8F8F8}
+% ── Farben ───────────────────────────────────────────────────
+\definecolor{PythonBlau}{HTML}{1565C0}
+\definecolor{PythonHellblau}{HTML}{E3F2FD}
+\definecolor{PythonGruen}{HTML}{2E7D32}
+\definecolor{PythonOrange}{HTML}{E65100}
+\definecolor{CodeHintergrund}{HTML}{F5F5F5}
+\definecolor{ROSRot}{HTML}{B71C1C}
+\definecolor{ROSHell}{HTML}{FFEBEE}
 
-% ── Python-Code ─────────────────────────────────────────────
+% ── listings-Konfiguration ───────────────────────────────────
+% footnotesize für KDP-Satzbreite (ca. 129 mm → ~72 Zeichen)
 \lstdefinestyle{pythonstyle}{
-    language=Python,
-    backgroundcolor=\color{CodeHintergrund},
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue!70!black}\bfseries,
-    stringstyle=\color{teal!80!black},
-    commentstyle=\color{gray!70!black}\itshape,
-    showstringspaces=false,
-    breaklines=true,
-    frame=single,
-    rulecolor=\color{gray!40},
-    tabsize=4,
-    extendedchars=true,
-    numbers=left,
-    numberstyle=\tiny\color{gray},
-    numbersep=8pt
-}
-\lstset{
-    style=pythonstyle,
-    literate=
-        {ä}{{\"a}}1 {ö}{{\"o}}1 {ü}{{\"u}}1
-        {Ä}{{\"A}}1 {Ö}{{\"O}}1 {Ü}{{\"U}}1
-        {ß}{{\ss}}1
+  backgroundcolor = \color{CodeHintergrund},
+  basicstyle      = \ttfamily\footnotesize,
+  breaklines      = true,
+  breakatwhitespace = false,
+  keywordstyle    = \color{PythonBlau}\bfseries,
+  stringstyle     = \color{PythonGruen},
+  commentstyle    = \color{gray}\itshape,
+  numberstyle     = \tiny\color{gray},
+  numbers         = left,
+  numbersep       = 5pt,
+  showstringspaces= false,
+  language        = Python,
+  literate        =
+    {ä}{{\"{a}}}1 {ö}{{\"{o}}}1 {ü}{{\"{u}}}1
+    {Ä}{{\"{A}}}1 {Ö}{{\"{O}}}1 {Ü}{{\"{U}}}1
+    {ß}{{\ss}}1
 }
 
-% ── Didaktische Boxen ────────────────────────────────────────
-\newtcolorbox{merksatz}[1][]{enhanced,breakable,
-    colback=MerksatzFarbe,colframe=blue!60!black,
-    fonttitle=\bfseries,title=Merksatz,#1}
+\lstdefinestyle{bashstyle}{
+  backgroundcolor = \color{CodeHintergrund},
+  basicstyle      = \ttfamily\footnotesize,
+  breaklines      = true,
+  breakatwhitespace = false,
+  commentstyle    = \color{gray}\itshape,
+  showstringspaces= false,
+  literate        =
+    {ä}{{\"{a}}}1 {ö}{{\"{o}}}1 {ü}{{\"{u}}}1
+    {Ä}{{\"{A}}}1 {Ö}{{\"{O}}}1 {Ü}{{\"{U}}}1
+    {ß}{{\ss}}1
+}
 
-\newtcolorbox{uebung}[1][]{enhanced,breakable,
-    colback=UebungFarbe,colframe=orange!80!black,
-    fonttitle=\bfseries,title=Übung,#1}
+\lstset{style=pythonstyle}
 
-\newtcolorbox{praxis}[1][]{enhanced,breakable,
-    colback=PraxisFarbe,colframe=green!60!black,
-    fonttitle=\bfseries,title=Praxisbezug Robotik,#1}
+% ── Tcolorbox-Umgebungen ─────────────────────────────────────
+\newtcolorbox{merksatz}[1][]{
+  colback=PythonHellblau, colframe=PythonBlau,
+  fonttitle=\sffamily\bfseries, title=Merksatz, #1}
 
-\newtcolorbox{tipp}[1][]{enhanced,breakable,
-    colback=TippFarbe,colframe=orange!40!black,
-    fonttitle=\bfseries,title=Tipp,#1}
+\newtcolorbox{uebung}[1][]{
+  colback=yellow!10, colframe=PythonOrange,
+  fonttitle=\sffamily\bfseries, title=Übung, #1}
 
-\newtcolorbox{ros}[1][]{enhanced,breakable,
-    colback=RosFarbe,colframe=red!70!black,
-    fonttitle=\bfseries,title=ROS2-Verbindung,#1}
+\newtcolorbox{praxis}[1][]{
+  colback=green!8, colframe=PythonGruen,
+  fonttitle=\sffamily\bfseries, title=Praxisbezug, #1}
 
-\newtcolorbox{analogie}[1][]{enhanced,breakable,
-    colback=AnalogieFarbe,colframe=purple!60!black,
-    fonttitle=\bfseries,title=Analogie,#1}
+\newtcolorbox{ros}[1][]{
+  colback=ROSHell, colframe=ROSRot,
+  fonttitle=\sffamily\bfseries, title=ROS2-Verbindung, #1}
 
-\newtcolorbox{loesung}[1][]{enhanced,breakable,
-    colback=LoesungFarbe,colframe=purple!60!black,
-    fonttitle=\bfseries,title=Lösung,#1}
+\newtcolorbox{analogie}[1][]{
+  colback=PythonHellblau, colframe=PythonBlau,
+  fonttitle=\sffamily\bfseries, title=Analogie, #1}
+
+\newtcolorbox{loesung}[1][]{
+  colback=green!8, colframe=PythonGruen,
+  fonttitle=\sffamily\bfseries, title=Schritt-für-Schritt-Lösung, #1}
+
+% ── hyperref (Druck: neutrale Farben) ────────────────────────
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = black,
+  urlcolor   = black,
+  citecolor  = black
+}
+
+% ── TOC-Breite ───────────────────────────────────────────────
+\DeclareTOCStyleEntry[numberwidth=3em]{tocline}{part}
+
+% ── Band-übergreifende Variablen ─────────────────────────────
+\newcommand{\BuchReihe}{Robotik entwickeln lernen}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Erste Auflage}
