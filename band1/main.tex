@@ -66,15 +66,18 @@
 
 % ── hyperref: für Druck neutrale Farben ──────────────────────
 \usepackage[
-  colorlinks  = true,
-  linkcolor   = black,
-  urlcolor    = black,
-  citecolor   = black,
+  colorlinks = true,
+  linkcolor  = black,
+  urlcolor   = black,
+  citecolor  = black
+]{hyperref}
+% PDF-Metadaten separat: keyval verträgt keine Kommas im \usepackage[]-Argument
+\hypersetup{
   pdfauthor   = {Wolfgang Becker},
   pdftitle    = {Die Robotik-Werkstatt},
-  pdfsubject  = {Linux, Docker und Entwicklungswerkzeuge für ROS2},
+  pdfsubject  = {Linux, Docker und Entwicklungswerkzeuge fuer ROS2},
   pdfkeywords = {Robotik, Linux, Docker, ROS2, Arduino}
-]{hyperref}
+}
 
 % ── Band-Variablen ───────────────────────────────────────────
 \newcommand{\BuchReihe}{Robotik entwickeln lernen}
