@@ -1,0 +1,738 @@
+%% ============================================================
+%% Teil I: Python kompakt – was du für ROS2 wirklich brauchst
+%% Band 2 – Kapitel 1 bis 5
+%% ============================================================
+
+\part{Python kompakt}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Python einsetzen – welche Version, welcher Stil?}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kennst die Python-Version, die ROS2~Jazzy voraussetzt,
+verstehst den Unterschied zwischen Systeminstallation und
+virtueller Umgebung in ROS2-Projekten und kannst
+Type~Hints, f-Strings und den \texttt{bytes}/\texttt{str}-Unterschied
+bei pyserial erklären.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{sensor\_bridge.py} aus Band~1 funktioniert.
+Jetzt soll er zum ROS2-Node werden.
+In \texttt{rclpy} sieht der erste Import so aus:
+
+\begin{lstlisting}
+import rclpy
+from rclpy.node import Node
+\end{lstlisting}
+
+Das klappt -- aber nur mit der richtigen Python-Version
+und nur, wenn ROS2 korrekt geladen ist.
+Außerdem: Sobald du \texttt{def lese\_arduino(self) -> None:} schreibst
+und VS~Code kein Autovervollständigung liefert, fragst du dich:
+Was fehlt hier?
+
+\begin{aufgabeBox}
+Stelle sicher, dass Python in der richtigen Version läuft,
+verstehe den \texttt{bytes}/\texttt{str}-Unterschied bei pyserial
+und füge Type~Hints in \texttt{sensor\_bridge.py} ein.
+\end{aufgabeBox}
+
+\section{Erster Lösungsversuch}
+
+\begin{lstlisting}
+python --version
+# Python 2.7.18 -- falsch!
+python3 --version
+# Python 3.12.3 -- richtig
+\end{lstlisting}
+
+\begin{problemBox}
+ROS2~Jazzy braucht Python~3.10 oder neuer.
+\texttt{python} (ohne "`3"') zeigt auf Python~2.7 auf manchen
+Systemen -- und damit auf eine Version, die ROS2 nicht versteht.
+Außerdem: rclpy ist systemweit installiert,
+nicht in einer virtuellen Umgebung.
+pip-Pakete in einem \texttt{venv} sehen rclpy nicht.
+\end{problemBox}
+
+\section{Was wir dafür brauchen}
+
+\begin{wissenBox}
+\textbf{Drei Grundregeln für Python in ROS2-Projekten:}
+
+\begin{enumerate}
+\item \textbf{Immer \texttt{python3}}, nie \texttt{python}.
+  ROS2 sourced seinen Pfad via \texttt{source /opt/ros/jazzy/setup.bash} --
+  danach zeigt \texttt{python3} garantiert auf die richtige Version.
+
+\item \textbf{Kein \texttt{venv} für ROS2-Nodes.}
+  \texttt{rclpy} ist systemweit installiert
+  (\texttt{/opt/ros/jazzy/lib/python3.12/site-packages/rclpy}).
+  Ein \texttt{venv} sieht das nicht.
+  Für Drittbibliotheken (\texttt{pyserial}, \texttt{pyyaml}, \texttt{numpy}):
+  entweder \texttt{pip3 install --break-system-packages}
+  oder im Docker-Container wie in Band~1.
+
+\item \textbf{Type~Hints aktivieren.}
+  Pylance in VS~Code liest Type~Hints und zeigt dir Fehler
+  schon beim Schreiben -- bevor der Node läuft.
+\end{enumerate}
+\end{wissenBox}
+
+\subsection{bytes vs. str – der pyserial-Unterschied}
+
+Pyserial liefert immer \texttt{bytes}, nie \texttt{str}:
+
+\begin{lstlisting}
+import serial
+ser = serial.Serial('/dev/arduino', 9600, timeout=1)
+
+zeile = ser.readline()
+# type: bytes
+# Wert: b'R=87 cm  L=124 cm\r\n'
+
+text = zeile.decode('utf-8').strip()
+# type: str
+# Wert: 'R=87 cm  L=124 cm'
+\end{lstlisting}
+
+Serielle Kommunikation ist immer binär -- der Port weiß nicht,
+ob das ASCII, UTF-8 oder Rohdaten sind.
+\texttt{.decode('utf-8')} ist deshalb nicht optional,
+sondern Pflicht.
+
+\subsection{Type Hints -- der freiwillige Vertrag}
+
+\begin{lstlisting}
+# Ohne Type Hints: funktioniert, aber unklar
+def parse_zeile(zeile):
+    pass
+
+# Mit Type Hints: VS Code kennt Ein- und Ausgabe
+def parse_zeile(zeile: str) -> tuple[int, int] | None:
+    """Parst 'R=87 cm  L=124 cm' zu (87, 124) oder None."""
+    pass
+\end{lstlisting}
+
+Type~Hints ändern das Laufzeitverhalten nicht.
+Aber Pylance liest sie -- und zeigt dir sofort, wenn du
+\texttt{parse\_zeile(87)} statt \texttt{parse\_zeile("R=87 cm")} schreibst.
+
+\section{Schritt-für-Schritt-Lösung}
+
+\begin{loesungBox}
+\textbf{Schritt~1:} Python-Version und ROS2 prüfen.
+\begin{lstlisting}[language=bash]
+source /opt/ros/jazzy/setup.bash
+python3 --version  # muss 3.10+ sein
+python3 -c "import rclpy; print('rclpy OK')"
+\end{lstlisting}
+
+\textbf{Schritt~2:} \texttt{sensor\_bridge.py} mit Type~Hints versehen.
+\begin{lstlisting}
+#!/usr/bin/env python3
+# stufe2_ros2/src/sensor_bridge.py -- Version 0.4
+import re
+import serial
+import yaml
+from pathlib import Path
+
+def parse_zeile(zeile: str) -> tuple[int, int] | None:
+    """Parst 'R=87 cm  L=124 cm' -> (87, 124) oder None."""
+    m = re.match(r'R=(\d+)\s+cm\s+L=(\d+)\s+cm', zeile.strip())
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return None
+
+def cm_zu_meter(cm: int) -> float:
+    """Einheitenumrechnung für sensor_msgs/Range."""
+    return float(cm) / 100.0
+\end{lstlisting}
+
+\textbf{Schritt~3:} Type-Check mit mypy.
+\begin{lstlisting}[language=bash]
+pip3 install mypy --break-system-packages
+mypy src/sensor_bridge.py
+# Success: no issues found in 1 source file
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Bisher:} \texttt{sensor\_bridge.py} aus Band~1 -- ohne Type Hints.\\
+\textbf{Heute:} Type Hints für alle Funktionen, \texttt{cm\_zu\_meter()} hinzugefügt,
+mypy bestätigt Korrektheit.\\
+\textbf{Nächstes Kapitel:} Den Bridge als Klasse aufbauen -- Vorbereitung auf rclpy.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} Immer \texttt{python3}. Kein \texttt{venv} für ROS2-Nodes.
+\texttt{bytes.decode('utf-8')} ist Pflicht bei pyserial.
+Type~Hints kosten nichts und geben dir Pylance als kostenlosen Code-Reviewer.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{python} statt \texttt{python3}: Führt zu Python~2, rclpy-Import schlägt fehl.
+\item \texttt{venv} mit rclpy: \texttt{ModuleNotFoundError: No module named 'rclpy'} --
+  rclpy ist nicht im venv sichtbar.
+\item \texttt{int("87.5")}: \texttt{ValueError} -- erst \texttt{float()}, dann \texttt{int()}.
+\item \texttt{tuple[int, int]} ohne Python~3.9+: \texttt{from typing import Tuple} verwenden.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\begin{enumerate}
+\item Füge Type~Hints in die gesamte \texttt{sensor\_bridge.py} aus Band~1 ein
+  und führe \texttt{mypy} aus. Behebe alle Warnungen.
+\item Schreibe eine Funktion \texttt{validiere\_abstand(cm: int) -> bool},
+  die \texttt{True} zurückgibt, wenn der Wert zwischen 2 und 400\,cm liegt.
+\item Was passiert, wenn der Arduino \texttt{"Bremsen\textbackslash r\textbackslash n"} sendet
+  statt \texttt{"R=87 cm  L=124 cm"}? Passe \texttt{parse\_zeile()} entsprechend an.
+\end{enumerate}
+\end{uebungBox}
+
+\begin{quizBox}
+\begin{enumerate}
+\item Warum liefert pyserial \texttt{bytes} statt \texttt{str}?
+\item Was ändert ein Type~Hint am Laufzeitverhalten?
+\item Warum ist ein \texttt{venv} für ROS2-Nodes problematisch?
+\end{enumerate}
+\textit{Antworten:}
+1.~Serielle Kommunikation ist binär; der Typ des Inhalts ist dem Port unbekannt.
+2.~Nichts -- Type~Hints sind reine Metadaten für Werkzeuge wie mypy und Pylance.
+3.~rclpy ist systemweit unter \texttt{/opt/ros/} installiert und im venv nicht sichtbar.
+\end{quizBox}
+
+\begin{haubeBox}
+\textbf{Warum PEP~484 -- Type~Hints erst 2014?}
+
+Python wurde als dynamische Skriptsprache entworfen -- schnell zu schreiben,
+kein Compiler nötig. Das war 1991 ein Vorteil.
+Als Python-Projekte aber größer wurden (Django, NumPy, ROS2),
+wurde das fehlende Typsystem zum Problem:
+Fehler zeigten sich erst zur Laufzeit.
+
+PEP~484 löst das ohne den Interpreter zu ändern:
+Type~Hints sind optionale Metadaten, die statische Analysetools lesen.
+Der Interpreter ignoriert sie vollständig.
+Das ist ein typischer Python-Kompromiss -- Rückwärtskompatibilität
+über alles.
+\end{haubeBox}
+
+\begin{robotikBox}
+In \texttt{sensor\_msgs/Range} ist das \texttt{range}-Feld ein \texttt{float32}.
+\texttt{cm\_zu\_meter()} liefert genau das.
+In Teil~III siehst du, wie der Publisher-Node das Range-Objekt befüllt --
+und warum \texttt{float32} statt \texttt{float64} die richtige Wahl für Sensordaten ist.
+\end{robotikBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen einen ROS2-Node als Klasse schreiben –
+  was bedeuten \texttt{self} und \texttt{super()}?}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst Klassen, Instanzmethoden und Vererbung in Python,
+kannst erklären, warum jeder rclpy-Node eine Klasse ist,
+und schreibst deinen ersten \texttt{MinimalNode},
+der sich korrekt initialisiert.
+\end{lernziele}
+
+\section{Situation}
+
+Die rclpy-Dokumentation zeigt diesen Code:
+
+\begin{lstlisting}
+class MinimalNode(Node):
+    def __init__(self):
+        super().__init__('minimal_node')
+\end{lstlisting}
+
+Drei Dinge, die Anfänger verwirren:
+Was ist \texttt{Node} -- und warum erbt MinimalNode davon?
+Was bedeutet \texttt{self}?
+Warum \texttt{super().\_\_init\_\_()}?
+
+\begin{aufgabeBox}
+Verstehe das Klassensystem von Python so weit,
+dass du jeden rclpy-Node selbst schreiben kannst --
+ohne die Struktur auswendig zu lernen.
+\end{aufgabeBox}
+
+\section{Das Klassensystem in Python}
+
+\begin{wissenBox}
+\textbf{Eine Klasse ist eine Vorlage. Eine Instanz ist das konkrete Objekt.}
+
+\begin{lstlisting}
+class Sensor:
+    """Vorlage für einen Ultraschallsensor."""
+
+    def __init__(self, name: str, max_abstand: float) -> None:
+        # self = dieses konkrete Objekt (die Instanz)
+        self.name = name                # Instanzvariable
+        self.max_abstand = max_abstand  # Instanzvariable
+        self._messwerte: list[float] = []  # privat, per Konvention
+
+    def messe(self, rohwert: int) -> float:
+        """Konvertiert Rohwert und speichert ihn."""
+        wert = float(rohwert) / 100.0
+        self._messwerte.append(wert)
+        return wert
+
+    def mittelwert(self) -> float:
+        """Gibt den Mittelwert aller Messungen zurück."""
+        if not self._messwerte:
+            return 0.0
+        return sum(self._messwerte) / len(self._messwerte)
+
+# Zwei unabhängige Instanzen
+sensor_rechts = Sensor("rechts", max_abstand=4.0)
+sensor_links  = Sensor("links",  max_abstand=4.0)
+
+sensor_rechts.messe(87)   # -> 0.87
+sensor_links.messe(124)   # -> 1.24
+\end{lstlisting}
+
+\textbf{Merke:} \texttt{self} ist kein Schlüsselwort -- es ist
+eine Konvention. Python übergibt die Instanz automatisch
+als erstes Argument jeder Methode.
+\texttt{sensor\_rechts.messe(87)} ruft intern
+\texttt{Sensor.messe(sensor\_rechts, 87)} auf.
+\end{wissenBox}
+
+\subsection{Vererbung -- \texttt{Node} als Basisklasse}
+
+\texttt{rclpy.node.Node} stellt alles bereit, was ein ROS2-Node braucht:
+Logger, Publisher, Subscriber, Timer, Parameter.
+Dein Node erbt das alles, ohne es neu zu schreiben.
+
+\begin{lstlisting}
+from rclpy.node import Node
+
+class ArduinoBridgeNode(Node):
+    def __init__(self) -> None:
+        # 1. Basisklasse initialisieren -- MUSS als Erstes kommen
+        super().__init__('arduino_bridge')
+        # Jetzt sind self.get_logger(), self.create_publisher() usw. verfügbar
+
+        # 2. Eigene Initialisierung
+        self._port: str = self.declare_parameter(
+            'port', '/dev/arduino'
+        ).get_parameter_value().string_value
+
+        self.get_logger().info(f"ArduinoBridgeNode gestartet. Port: {self._port}")
+\end{lstlisting}
+
+\texttt{super().\_\_init\_\_('arduino\_bridge')} tut zwei Dinge:
+\begin{enumerate}
+\item Es initialisiert den ROS2-Node mit dem Namen \texttt{'arduino\_bridge'}.
+  Dieser Name erscheint in \texttt{ros2 node list}.
+\item Es richtet alle internen ROS2-Strukturen ein, die Node braucht.
+  Ohne diesen Aufruf stürzt jeder Zugriff auf \texttt{self.get\_logger()} ab.
+\end{enumerate}
+
+\section{Schritt-für-Schritt-Lösung}
+
+\begin{loesungBox}
+Erstelle \texttt{stufe2\_ros2/src/arduino\_bridge\_node.py} als Klasse:
+
+\begin{lstlisting}
+#!/usr/bin/env python3
+# stufe2_ros2/src/arduino_bridge_node.py -- Version 0.1
+"""ArduinoBridgeNode: liest Serial, published Sensordaten."""
+
+import rclpy
+from rclpy.node import Node
+
+class ArduinoBridgeNode(Node):
+    """Liest HC-SR04-Daten vom Arduino und published sie als ROS2-Topics."""
+
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+        self.get_logger().info("ArduinoBridgeNode bereit.")
+
+def main(args: list[str] | None = None) -> None:
+    rclpy.init(args=args)
+    node = ArduinoBridgeNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+Testen (ohne ROS2-Paket, direkt):
+\begin{lstlisting}[language=bash]
+source /opt/ros/jazzy/setup.bash
+python3 src/arduino_bridge_node.py
+# [INFO] [arduino_bridge]: ArduinoBridgeNode bereit.
+# Strg+C zum Beenden
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Bisher:} \texttt{sensor\_bridge.py} als Funktion.\\
+\textbf{Heute:} \texttt{arduino\_bridge\_node.py} als Klasse -- bereit für Publisher.\\
+\textbf{Nächstes Kapitel:} Type~Hints und Datenstrukturen vertiefen.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} Jeder rclpy-Node ist eine Klasse, die von \texttt{Node} erbt.
+\texttt{super().\_\_init\_\_('node\_name')} muss als Erstes in \texttt{\_\_init\_\_()} stehen.
+Der Node-Name erscheint in \texttt{ros2 node list} -- er sollte eindeutig
+und beschreibend sein.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{super().\_\_init\_\_()} vergessen:
+  \texttt{AttributeError: 'ArduinoBridgeNode' has no attribute '\_node'} --
+  der Node ist nicht initialisiert.
+\item Node-Name mit Slash: \texttt{'/arduino\_bridge'} ist falsch;
+  der Leading-Slash kommt vom Namespace, nicht vom Namen selbst.
+\item \texttt{rclpy.init()} vergessen: \texttt{RuntimeError: rclpy not initialized}.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{haubeBox}
+\textbf{Warum ist \texttt{super()} in Python so merkwürdig?}
+
+In C++ schreibt man \texttt{Node::Node(name)} explizit mit dem Klassennamen.
+Python's \texttt{super()} ist dynamisch: Es findet die richtige Basisklasse
+anhand der sogenannten MRO (Method Resolution Order) -- dem Algorithmus,
+der bei Mehrfachvererbung bestimmt, welche Methode zuerst aufgerufen wird.
+Für einfache Vererbung wie \texttt{ArduinoBridgeNode(Node)} ist \texttt{super()}
+identisch mit \texttt{Node.\_\_init\_\_(self, 'arduino\_bridge')}.
+Die MRO ist nur bei \texttt{class C(A, B):} relevant.
+\end{haubeBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Fehler abfangen – \texttt{try/except} und Context Manager}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kannst \texttt{SerialException} und andere Hardware-Fehler sauber abfangen,
+verstehst Context~Manager (\texttt{with}-Statement) und
+verwendest den Python-Logger statt \texttt{print()}.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{arduino\_bridge\_node.py} stürzt ab,
+sobald der Arduino nicht angesteckt ist:
+
+\begin{lstlisting}
+ser = serial.Serial('/dev/arduino', 9600)
+# serial.serialutil.SerialException: [Errno 2] No such file or directory: '/dev/arduino'
+\end{lstlisting}
+
+Ein ROS2-Node darf nicht abstürzen -- er soll warten, melden und neu versuchen.
+
+\begin{aufgabeBox}
+Mache \texttt{arduino\_bridge\_node.py} robust gegen fehlende Hardware:
+SerialException abfangen, sauber loggen, Reconnect-Logik hinzufügen.
+\end{aufgabeBox}
+
+\section{try/except/finally in Python}
+
+\begin{wissenBox}
+\begin{lstlisting}
+try:
+    # Code, der einen Fehler auslösen könnte
+    ser = serial.Serial('/dev/arduino', 9600, timeout=1)
+except serial.SerialException as e:
+    # Fehler abfangen -- e enthält die Fehlermeldung
+    self.get_logger().error(f"Serial-Fehler: {e}")
+except OSError as e:
+    # Breiter: alle OS-Fehler (Permission denied, etc.)
+    self.get_logger().error(f"OS-Fehler: {e}")
+else:
+    # Wird nur ausgeführt, wenn KEIN Fehler aufgetreten ist
+    self.get_logger().info("Verbunden.")
+finally:
+    # Wird IMMER ausgeführt -- ideal für Aufräumarbeiten
+    pass
+\end{lstlisting}
+
+\textbf{Faustregel:} Fange immer den spezifischsten Fehler zuerst.
+\texttt{except Exception:} ist der letzte Ausweg -- es versteckt Bugs.
+\end{wissenBox}
+
+\subsection{Context Manager -- \texttt{with} statt \texttt{try/finally}}
+
+\begin{lstlisting}
+# Ohne Context Manager: Fehleranfällig
+ser = serial.Serial('/dev/arduino', 9600)
+try:
+    data = ser.readline()
+finally:
+    ser.close()  # Wird vergessen? Port bleibt offen.
+
+# Mit Context Manager: Sauber und sicher
+with serial.Serial('/dev/arduino', 9600) as ser:
+    data = ser.readline()
+# ser.close() wird automatisch aufgerufen -- auch bei Ausnahmen
+\end{lstlisting}
+
+\begin{lstlisting}
+# Robuste Reconnect-Logik für den Node
+def _verbinde(self) -> bool:
+    """Versucht, den Serial-Port zu öffnen. Gibt True zurück bei Erfolg."""
+    try:
+        self._ser = serial.Serial(self._port, self._baudrate, timeout=1.0)
+        self.get_logger().info(f"Verbunden: {self._port}")
+        return True
+    except serial.SerialException as e:
+        self.get_logger().warning(f"Kein Arduino: {e}. Neuer Versuch in 5s.")
+        return False
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Robuste Fehlerbehandlung im \texttt{arduino\_bridge\_node}. \\
+\textbf{Nächstes Kapitel:} Callbacks und Lambda -- wie ROS2-Timer funktionieren.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} \texttt{with serial.Serial(...) as ser:} ist besser als
+manuellem \texttt{try/finally}. Spezifische Exceptions (\texttt{SerialException})
+vor allgemeinen (\texttt{Exception}) fangen. ROS2-Nodes loggen mit
+\texttt{self.get\_logger().info/warning/error()} -- nie mit \texttt{print()}.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{except Exception:} ohne spezifischen Typ: Versteckt echte Bugs
+  (z.\,B. \texttt{TypeError} in der Verarbeitungslogik).
+\item Port nicht schließen: Beim Neustart des Nodes
+  ist der Port noch belegt (\texttt{Permission denied}).
+\item \texttt{print()} statt Logger: Nachrichten erscheinen nicht in
+  \texttt{ros2 log} und nicht in \texttt{journalctl}.
+\end{itemize}
+\end{fehlerBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Daten strukturieren –
+  Dicts, Dataclasses und NamedTuples}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kennst den Unterschied zwischen \texttt{dict},
+\texttt{dataclass} und \texttt{NamedTuple} und wählst
+das richtige Werkzeug für Sensordaten im Node.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{parse\_zeile()} gibt \texttt{tuple[int, int]} zurück.
+Das reicht für zwei Werte -- aber was passiert,
+wenn der Arduino bald auch Batterieladung und Temperatur sendet?
+\texttt{tuple[int, int, float, int]} wird unleserlich.
+
+\begin{aufgabeBox}
+Erstelle eine Datenstruktur \texttt{SensorDaten}, die Abstandswerte,
+Zeitstempel und Statusinformationen klar bündelt.
+\end{aufgabeBox}
+
+\section{Die drei Optionen}
+
+\begin{wissenBox}
+\textbf{dict:} Flexibel, aber unsicher.
+\begin{lstlisting}
+data = {"rechts": 87, "links": 124, "einheit": "cm"}
+data["rechts"]   # OK
+data["Rechts"]   # KeyError -- Tippfehler zur Laufzeit
+\end{lstlisting}
+
+\textbf{NamedTuple:} Unveränderlich, typisiert, leichtgewichtig.
+\begin{lstlisting}
+from typing import NamedTuple
+class SensorDaten(NamedTuple):
+    rechts_cm: int
+    links_cm:  int
+    zeitstempel: float
+
+daten = SensorDaten(rechts_cm=87, links_cm=124, zeitstempel=1720000000.0)
+daten.rechts_cm   # 87 -- typsicher, kein KeyError
+daten.rechts_cm = 90  # AttributeError -- unveränderlich
+\end{lstlisting}
+
+\textbf{dataclass:} Veränderlich, typisiert, mehr Kontrolle.
+\begin{lstlisting}
+from dataclasses import dataclass, field
+import time
+
+@dataclass
+class SensorDaten:
+    rechts_cm: int
+    links_cm:  int
+    zeitstempel: float = field(default_factory=time.time)
+    gueltig: bool = True
+
+daten = SensorDaten(rechts_cm=87, links_cm=124)
+daten.rechts_cm = 90   # OK -- veränderlich
+\end{lstlisting}
+\end{wissenBox}
+
+\textbf{Empfehlung für robotik-uno-q:}
+\texttt{dataclass} für \texttt{SensorDaten},
+weil Zeitstempel automatisch gesetzt werden soll
+und Gültigkeitsflag nachträglich gesetzt werden kann.
+
+\begin{lstlisting}
+# stufe2_ros2/src/sensor_daten.py
+from dataclasses import dataclass, field
+import time
+
+@dataclass
+class SensorDaten:
+    """Bündelt einen Messwert vom HC-SR04-Dual-Sensor."""
+    rechts_cm:   int
+    links_cm:    int
+    zeitstempel: float = field(default_factory=time.time)
+    gueltig:     bool  = True
+
+    @property
+    def minimum_cm(self) -> int:
+        """Gibt den kleineren der beiden Abstandswerte zurück."""
+        return min(self.rechts_cm, self.links_cm)
+
+    @property
+    def rechts_m(self) -> float:
+        return self.rechts_cm / 100.0
+
+    @property
+    def links_m(self) -> float:
+        return self.links_cm / 100.0
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{SensorDaten}-Dataclass erstellt.
+Parser gibt jetzt \texttt{SensorDaten} zurück statt \texttt{tuple[int, int]}.\\
+\textbf{Nächstes Kapitel:} Callbacks und Lambda für Timer.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{dict} für unbekannte Schlüssel zur Laufzeit (YAML-Config).
+\texttt{NamedTuple} für unveränderliche Datenpakete.
+\texttt{dataclass} für Objekte mit Methoden und Defaultwerten.
+In rclpy-Nodes ist \texttt{dataclass} fast immer die richtige Wahl.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Funktionen als Parameter übergeben –
+  Callbacks und Lambda}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst, warum rclpy-Timer und Subscriber Funktionen
+als Parameter erwarten, und kannst Callbacks,
+Lambda-Ausdrücke und \texttt{functools.partial} korrekt einsetzen.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{create\_timer(0.1, callback)} erwartet eine Funktion als zweites Argument.
+Was genau übergibst du da?
+Und was, wenn der Callback einen Parameter braucht,
+den \texttt{create\_timer()} nicht kennt?
+
+\begin{aufgabeBox}
+Schreibe einen Timer-Callback für \texttt{arduino\_bridge\_node},
+der alle 100\,ms die Serial-Leitung abfragt --
+und verstehe, warum Funktionen in Python Objekte sind.
+\end{aufgabeBox}
+
+\section{Funktionen als Objekte}
+
+\begin{wissenBox}
+In Python ist eine Funktion ein Objekt -- sie kann in einer Variable
+gespeichert, als Parameter übergeben und zur Laufzeit erstellt werden.
+
+\begin{lstlisting}
+def lese_sensor() -> None:
+    print("Sensor wird gelesen...")
+
+# Funktion als Objekt -- ohne ()
+aktion = lese_sensor        # aktion IST die Funktion
+aktion()                    # jetzt wird sie aufgerufen
+
+# Lambda: anonyme Einzeiler-Funktion
+quadrat = lambda x: x * x
+quadrat(5)                  # -> 25
+
+# functools.partial: Funktion mit vorausgefüllten Argumenten
+import functools
+def logge(level: str, nachricht: str) -> None:
+    print(f"[{level}] {nachricht}")
+
+logge_info = functools.partial(logge, "INFO")
+logge_info("Sensor verbunden.")   # -> [INFO] Sensor verbunden.
+\end{lstlisting}
+\end{wissenBox}
+
+\subsection{Timer-Callback in rclpy}
+
+\begin{lstlisting}
+class ArduinoBridgeNode(Node):
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+
+        # create_timer(periode_in_sek, callback_funktion)
+        # Alle 100 ms wird self._lese_arduino aufgerufen
+        self._timer = self.create_timer(0.1, self._lese_arduino)
+
+    def _lese_arduino(self) -> None:
+        """Wird alle 100 ms vom Timer aufgerufen."""
+        # Hier: Serial-Zeile lesen, parsen, publishen
+        self.get_logger().debug("Timer-Tick")
+\end{lstlisting}
+
+\texttt{self.\_lese\_arduino} ist ein \emph{Bound Method} --
+eine Methode, die bereits an die Instanz gebunden ist.
+Wenn der Timer sie aufruft, hat \texttt{self} seinen Wert.
+
+\begin{lstlisting}
+# Lambda für schnelle Inline-Callbacks (bei einfachen Fällen)
+self._timer = self.create_timer(
+    1.0,
+    lambda: self.get_logger().info("Heartbeat")
+)
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Timer-Callback für 10\,Hz-Sensor-Polling implementiert.\\
+\textbf{Nächster Teil:} Robotik-Bibliotheken -- NumPy, Matplotlib, OpenCV.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} Funktionen ohne \texttt{()} sind Objekte -- übergib sie so.
+\texttt{self.\_methode} ist bereits an \texttt{self} gebunden.
+Lambda für Einzeiler, \texttt{functools.partial} für Funktionen
+mit vorausgefüllten Argumenten.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{create\_timer(0.1, self.\_lese\_arduino())}:
+  Die Klammern rufen die Methode sofort auf und übergeben den
+  Rückgabewert (\texttt{None}) als Callback -- kein Timer-Tick.
+\item Lambda mit Seiteneffekten in Schleifen:
+  \texttt{for i in range(3): callbacks.append(lambda: print(i))} --
+  alle drei Lambdas drucken den letzten Wert von \texttt{i}.
+  Lösung: \texttt{lambda i=i: print(i)}.
+\end{itemize}
+\end{fehlerBox}
