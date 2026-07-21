@@ -1,0 +1,645 @@
+%% ============================================================
+%% Teil III: rclpy – ROS2 mit Python (Kapitel 9–14)
+%% Band 2 – Kapitel 9 bis 14
+%% ============================================================
+
+\part{rclpy -- ROS2 mit Python}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen einen echten ROS2-Node schreiben}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du schreibst einen vollständigen ROS2-Node mit rclpy,
+der sich korrekt initialisiert, loggt und wieder beendet.
+Du verstehst den Unterschied zwischen \texttt{rclpy.spin()} und
+\texttt{rclpy.spin\_once()} und weißt, was der Executor tut.
+\end{lernziele}
+
+\section{Situation}
+
+In Band~1 Kapitel~27 hast du den ROS2-Node-Graph im Kopf aufgebaut.
+Jetzt kommt der erste echte Node:
+\texttt{arduino\_bridge\_node} bekommt seine ROS2-Grundstruktur.
+
+\begin{aufgabeBox}
+Schreibe den vollständigen \texttt{arduino\_bridge\_node.py}
+als rclpy-Node, der startet, sich meldet und sauber beendet.
+\end{aufgabeBox}
+
+\section{Die rclpy-Grundstruktur}
+
+\begin{wissenBox}
+\begin{lstlisting}
+#!/usr/bin/env python3
+"""Minimaler rclpy-Node als Ausgangspunkt."""
+
+import rclpy
+from rclpy.node import Node
+
+class MinimalNode(Node):
+    def __init__(self) -> None:
+        super().__init__('minimal_node')
+        self.get_logger().info("MinimalNode gestartet.")
+        # Timer: alle 1.0 Sekunden
+        self._timer = self.create_timer(1.0, self._tick)
+        self._zaehler: int = 0
+
+    def _tick(self) -> None:
+        self._zaehler += 1
+        self.get_logger().info(f"Tick #{self._zaehler}")
+
+def main(args: list[str] | None = None) -> None:
+    rclpy.init(args=args)
+    node = MinimalNode()
+    try:
+        rclpy.spin(node)      # Blockiert, bis Strg+C
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()   # ROS2-Ressourcen freigeben
+        rclpy.shutdown()      # rclpy herunterfahren
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+\textbf{\texttt{rclpy.spin(node)}:} Blockiert und verarbeitet alle
+eingehenden Nachrichten und Timer-Ticks -- bis der Node zerstört wird.
+
+\textbf{\texttt{rclpy.spin\_once(node)}:} Verarbeitet genau eine Nachricht
+oder einen Timer-Tick, dann kehrt die Funktion zurück.
+Nützlich, wenn du die Kontrolle zwischendurch brauchst.
+\end{wissenBox}
+
+\subsection{Was ist ein Executor?}
+
+\begin{haubeBox}
+\texttt{rclpy.spin(node)} erstellt intern einen \texttt{SingleThreadedExecutor}:
+Er verarbeitet alle Callbacks (Timer, Subscriber, Service-Antworten)
+nacheinander in einem einzigen Thread.
+
+Für fortgeschrittene Nodes mit vielen parallelen Callbacks
+gibt es \texttt{MultiThreadedExecutor}:
+\begin{lstlisting}
+from rclpy.executors import MultiThreadedExecutor
+executor = MultiThreadedExecutor(num_threads=4)
+executor.add_node(node)
+executor.spin()
+\end{lstlisting}
+Für \texttt{arduino\_bridge\_node} reicht \texttt{SingleThreadedExecutor} --
+Sensor lesen und publishen ist sequenziell.
+\end{haubeBox}
+
+\section{Schritt-für-Schritt-Lösung}
+
+\begin{loesungBox}
+\begin{lstlisting}[language=bash]
+# Testen ohne ROS2-Paket (direkt)
+cd ~/robotik-uno-q/stufe2_ros2
+source /opt/ros/jazzy/setup.bash
+python3 src/arduino_bridge_node.py
+
+# In einem zweiten Terminal:
+source /opt/ros/jazzy/setup.bash
+ros2 node list
+# /arduino_bridge
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Erster echter ROS2-Node läuft. \texttt{ros2 node list} zeigt ihn.\\
+\textbf{Nächstes Kapitel:} Sensordaten als Topic publishen.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{rclpy.init()} → Node erstellen → \texttt{rclpy.spin()} → \texttt{destroy\_node()} → \texttt{rclpy.shutdown()}.
+Diese fünf Schritte sind das Grundgerüst jedes rclpy-Nodes.
+\texttt{try/except KeyboardInterrupt} fängt Strg+C sauber ab.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{rclpy.init()} zweimal aufrufen: \texttt{RuntimeError: Already initialized}.
+\item \texttt{destroy\_node()} vergessen: Port-Konflikte beim nächsten Start.
+\item Node-Name mit Bindestrich: \texttt{'arduino-bridge'} → Fehler.
+  Nur Buchstaben, Ziffern und Unterstriche erlaubt.
+\end{itemize}
+\end{fehlerBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Sensordaten publishen und empfangen –
+  Publisher und Subscriber}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du implementierst \texttt{arduino\_bridge\_node} als Publisher
+für \texttt{sensor\_msgs/Range} und \texttt{navigation\_node}
+als Subscriber -- und verstehst QoS-Profile.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{arduino\_bridge\_node} liest Sensordaten.
+\texttt{navigation\_node} braucht sie.
+In Band~1 haben wir dafür den \texttt{SensorBus} gebaut.
+ROS2-Topics ersetzen ihn -- mit Netzwerkfähigkeit, Zeitstempeln
+und Standard-Nachrichtentypen.
+
+\begin{aufgabeBox}
+Implementiere Publisher für \texttt{/sensor/rechts} und \texttt{/sensor/links}
+(\texttt{sensor\_msgs/Range}) im \texttt{arduino\_bridge\_node}
+und einen Subscriber im \texttt{navigation\_node}.
+\end{aufgabeBox}
+
+\section{Nachrichtentypen: sensor\_msgs/Range}
+
+\begin{lstlisting}
+from sensor_msgs.msg import Range
+
+# Range-Nachricht füllen
+msg = Range()
+msg.header.stamp = self.get_clock().now().to_msg()
+msg.header.frame_id = 'sensor_rechts'
+msg.radiation_type  = Range.ULTRASOUND    # HC-SR04
+msg.field_of_view   = 0.26               # ~15 Grad in Radiant
+msg.min_range       = 0.02               # 2 cm
+msg.max_range       = 4.00               # 400 cm
+msg.range           = 0.87              # aktueller Messwert in Metern
+\end{lstlisting}
+
+\section{Publisher implementieren}
+
+\begin{lstlisting}
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from sensor_msgs.msg import Range
+
+class ArduinoBridgeNode(Node):
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+
+        # QoS: Sensor-Daten -- Best Effort, nur letzter Wert zählt
+        sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
+        self._pub_rechts = self.create_publisher(
+            Range, '/sensor/rechts', sensor_qos)
+        self._pub_links  = self.create_publisher(
+            Range, '/sensor/links',  sensor_qos)
+
+        self._timer = self.create_timer(0.1, self._lese_und_publiziere)
+        self.get_logger().info("ArduinoBridgeNode bereit.")
+
+    def _lese_und_publiziere(self) -> None:
+        # Aus Band 1: Serial lesen und parsen
+        zeile = self._lese_serielle_zeile()
+        if zeile is None:
+            return
+        rechts_cm, links_cm = zeile
+
+        jetzt = self.get_clock().now().to_msg()
+        self._pub_rechts.publish(self._baue_range_msg(rechts_cm, 'sensor_rechts', jetzt))
+        self._pub_links.publish( self._baue_range_msg(links_cm,  'sensor_links',  jetzt))
+
+    def _baue_range_msg(self, cm: int, frame: str, stamp) -> Range:
+        msg = Range()
+        msg.header.stamp     = stamp
+        msg.header.frame_id  = frame
+        msg.radiation_type   = Range.ULTRASOUND
+        msg.field_of_view    = 0.26
+        msg.min_range        = 0.02
+        msg.max_range        = 4.00
+        msg.range            = float(cm) / 100.0
+        return msg
+\end{lstlisting}
+
+\section{Subscriber implementieren}
+
+\begin{lstlisting}
+from rclpy.node import Node
+from sensor_msgs.msg import Range
+
+class NavigationNode(Node):
+    def __init__(self) -> None:
+        super().__init__('navigation')
+
+        sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+        self._sub_rechts = self.create_subscription(
+            Range, '/sensor/rechts', self._cb_rechts, sensor_qos)
+        self._sub_links  = self.create_subscription(
+            Range, '/sensor/links',  self._cb_links,  sensor_qos)
+
+        self._rechts_m: float = 4.0
+        self._links_m:  float = 4.0
+
+    def _cb_rechts(self, msg: Range) -> None:
+        self._rechts_m = msg.range
+        self._entscheide()
+
+    def _cb_links(self, msg: Range) -> None:
+        self._links_m = msg.range
+        self._entscheide()
+
+    def _entscheide(self) -> None:
+        minimum = min(self._rechts_m, self._links_m)
+        if minimum < 0.25:
+            self.get_logger().warning(f"STOPP: {minimum:.2f}m")
+        elif minimum < 0.50:
+            self.get_logger().info(f"LANGSAM: {minimum:.2f}m")
+        else:
+            self.get_logger().debug(f"FREI: R={self._rechts_m:.2f}m L={self._links_m:.2f}m")
+\end{lstlisting}
+
+\begin{haubeBox}
+\textbf{QoS -- Quality of Service}
+
+\texttt{RELIABLE}: Jede Nachricht wird garantiert zugestellt -- wie TCP.
+Nötig für Service-Aufrufe und kritische Befehle.
+
+\texttt{BEST\_EFFORT}: Pakete können verloren gehen -- wie UDP.
+Ideal für Sensordaten: ein verlorener Messwert ist unwichtig,
+Latenz dagegen kritisch.
+
+\texttt{KEEP\_LAST + depth=1}: Subscriber empfängt nur den neuesten Wert.
+Für Sensordaten fast immer richtig: alte Abstandswerte sind wertlos.
+\end{haubeBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{arduino\_bridge\_node} published \texttt{sensor\_msgs/Range}.
+\texttt{navigation\_node} subscribed und trifft erste Fahrentscheidungen.\\
+\textbf{Nächstes Kapitel:} Motor-Befehle über \texttt{/cmd\_vel} senden.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{BEST\_EFFORT} für Sensor-Streams.
+\texttt{RELIABLE} für Service-Calls und Motor-Befehle.
+Publisher und Subscriber müssen \emph{kompatible} QoS-Profile haben,
+sonst fließen keine Nachrichten.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Motor-Befehle senden – \texttt{geometry\_msgs/Twist}}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du implementierst den \texttt{/cmd\_vel}-Publisher im \texttt{navigation\_node}
+mit \texttt{geometry\_msgs/Twist}, verstehst das Kinematikmodell
+des Differentialantriebs und weißt,
+wie \texttt{motor\_node} den Twist-Befehl umsetzt.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{navigation\_node} hat entschieden: links ausweichen.
+Jetzt braucht er einen Weg, dem \texttt{motor\_node}
+"`fahre links"' zu sagen -- in ROS2-Standardform.
+
+\begin{aufgabeBox}
+Erweitere \texttt{navigation\_node} um einen \texttt{/cmd\_vel}-Publisher
+und implementiere die Entscheidungslogik für das Ausweichmanöver.
+\end{aufgabeBox}
+
+\section{geometry\_msgs/Twist}
+
+\begin{wissenBox}
+\texttt{Twist} beschreibt eine Geschwindigkeit im 3D-Raum.
+Für einen mobilen Roboter auf dem Boden sind nur zwei Felder relevant:
+
+\begin{lstlisting}
+from geometry_msgs.msg import Twist
+
+msg = Twist()
+msg.linear.x  = 0.3   # Vorwärts in m/s  (>0 vorwärts, <0 rückwärts)
+msg.angular.z = 0.0   # Rotation in rad/s (>0 links, <0 rechts)
+
+# Beispiele:
+# Geradeaus 0.2 m/s:  linear.x=0.2, angular.z=0.0
+# Linkskurve:         linear.x=0.1, angular.z=0.5
+# Auf der Stelle:     linear.x=0.0, angular.z=1.0
+# Stopp:              linear.x=0.0, angular.z=0.0
+\end{lstlisting}
+\end{wissenBox}
+
+\begin{lstlisting}
+class NavigationNode(Node):
+    # ... (Subscriber aus Kapitel 10 behalten)
+
+    def __init__(self) -> None:
+        super().__init__('navigation')
+        # ... Subscriber ...
+        self._pub_cmd = self.create_publisher(
+            Twist, '/cmd_vel', 10)
+
+    def _entscheide(self) -> None:
+        cmd = Twist()
+        minimum = min(self._rechts_m, self._links_m)
+
+        if minimum < 0.25:                   # Stopp
+            cmd.linear.x  = 0.0
+            cmd.angular.z = 0.0
+        elif minimum < 0.50:                 # Langsam + ausweichen
+            cmd.linear.x  = 0.1
+            cmd.angular.z = 0.8 if self._rechts_m < self._links_m else -0.8
+        else:                                # Geradeaus
+            cmd.linear.x  = 0.2
+            cmd.angular.z = 0.0
+
+        self._pub_cmd.publish(cmd)
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{navigation\_node} published \texttt{/cmd\_vel}.\\
+\textbf{Nächstes Kapitel:} Services -- Notbremse als \texttt{/motor/stopp}.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} \texttt{linear.x} = Translation (vorwärts/rückwärts),
+\texttt{angular.z} = Rotation (links/rechts).
+Alle anderen Felder bleiben 0.0 für einen planaren Roboter.
+Twist ist der universelle ROS2-Befehl für mobile Roboter --
+Nav2 sendet ihn, \texttt{ros2 teleop\_twist\_keyboard} sendet ihn,
+dein Navigation-Node sendet ihn.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen eine Notbremse – Services in rclpy}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du implementierst \texttt{/motor/stopp} als ROS2-Service,
+verstehst den Unterschied zwischen Topic und Service
+und weißt, wann welches Pattern passt.
+\end{lernziele}
+
+\section{Situation}
+
+Topics sind asynchron: Der Publisher sendet, ohne zu wissen,
+ob jemand empfängt. Für eine Notbremse ist das zu unsicher.
+Services garantieren eine Antwort: "`Stopp-Befehl empfangen"' oder
+"`Fehler: Motor nicht erreichbar"'.
+
+\begin{aufgabeBox}
+Implementiere \texttt{/motor/stopp} als \texttt{std\_srvs/Trigger}-Service
+im \texttt{motor\_node} und rufe ihn aus dem \texttt{navigation\_node} auf.
+\end{aufgabeBox}
+
+\section{Service-Server implementieren}
+
+\begin{lstlisting}
+from std_srvs.srv import Trigger
+from rclpy.node import Node
+
+class MotorNode(Node):
+    def __init__(self) -> None:
+        super().__init__('motor')
+        self._srv = self.create_service(
+            Trigger, '/motor/stopp', self._stopp_callback)
+        self.get_logger().info("MotorNode bereit. Service /motor/stopp aktiv.")
+
+    def _stopp_callback(
+        self,
+        request:  Trigger.Request,
+        response: Trigger.Response
+    ) -> Trigger.Response:
+        """Notbremse: sendet Stopp-Befehl an Arduino."""
+        try:
+            # Hier: 'S\n' über Serial senden (aus Band 1)
+            self._sende_arduino('S')
+            response.success = True
+            response.message = "Motoren gestoppt."
+            self.get_logger().warning("NOTBREMSE ausgeloest.")
+        except Exception as e:
+            response.success = False
+            response.message = str(e)
+        return response
+\end{lstlisting}
+
+\section{Service-Client aufrufen}
+
+\begin{lstlisting}
+from std_srvs.srv import Trigger
+
+class NavigationNode(Node):
+    def __init__(self) -> None:
+        # ...
+        self._stopp_client = self.create_client(Trigger, '/motor/stopp')
+
+    def _notbremse(self) -> None:
+        """Synchroner Stopp-Aufruf (blockiert kurz)."""
+        if not self._stopp_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().error("Service /motor/stopp nicht erreichbar!")
+            return
+        req = Trigger.Request()
+        future = self._stopp_client.call_async(req)
+        # In einem einfachen Node: auf Antwort warten
+        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+        if future.result().success:
+            self.get_logger().warning("Notbremse bestaetigt.")
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{/motor/stopp}-Service implementiert und getestet.\\
+\textbf{Nächstes Kapitel:} Parameter -- Schwellenwerte zur Laufzeit ändern.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+Topic = "`Ich schicke etwas, egal ob jemand zuhört."'
+Service = "`Ich schicke etwas und warte auf Bestätigung."'
+Notbremsen, Konfigurationsänderungen und einmalige Aktionen:
+Service. Sensordaten, Befehle mit hoher Frequenz: Topic.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Parameter zur Laufzeit ändern –
+  \texttt{declare\_parameter} und Konfiguration}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verwendest ROS2-Parameter statt hartcodierter Werte,
+lädst \texttt{sensor\_config.yaml} über die Parameter-API
+und kannst Werte zur Laufzeit mit \texttt{ros2 param set} ändern.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{sensor\_bridge.py} aus Band~1 lädt \texttt{sensor\_config.yaml}
+direkt mit Python's yaml-Modul.
+In ROS2 gibt es einen besseren Weg:
+Parameter werden beim Node-Start übergeben,
+können zur Laufzeit geändert werden
+und erscheinen in \texttt{ros2 param list}.
+
+\begin{aufgabeBox}
+Ersetze die YAML-Direktladung durch ROS2-Parameter in \texttt{arduino\_bridge\_node}.
+\end{aufgabeBox}
+
+\begin{lstlisting}
+class ArduinoBridgeNode(Node):
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+
+        # Parameter deklarieren (mit Defaultwert)
+        self.declare_parameter('port',          '/dev/arduino')
+        self.declare_parameter('baudrate',      9600)
+        self.declare_parameter('min_abstand_m', 0.25)
+        self.declare_parameter('warn_abstand_m',0.50)
+
+        # Parameter lesen
+        self._port     = self.get_parameter('port').value
+        self._baudrate = self.get_parameter('baudrate').value
+        self._min_m    = self.get_parameter('min_abstand_m').value
+
+        self.get_logger().info(
+            f"Parameter: port={self._port}, baudrate={self._baudrate}")
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# Node mit Parameters-File starten
+ros2 run robotik_uno_q arduino_bridge_node \
+    --ros-args --params-file config/sensor_config.yaml
+
+# Zur Laufzeit ändern
+ros2 param set /arduino_bridge min_abstand_m 0.30
+
+# Parameter anzeigen
+ros2 param list /arduino_bridge
+ros2 param get /arduino_bridge baudrate
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Parameter statt YAML-Direktladung. Schwellenwerte zur Laufzeit änderbar.\\
+\textbf{Nächstes Kapitel:} Launch-Datei -- alle Nodes mit einem Befehl starten.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{declare\_parameter('name', default)} registriert einen Parameter mit Fallback.
+\texttt{--params-file sensor\_config.yaml} überschreibt Defaults beim Start.
+\texttt{ros2 param set} ändert Werte zur Laufzeit -- ohne Neustart.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen alle Nodes gemeinsam starten – Launch-Dateien}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du schreibst eine Python-Launch-Datei, die alle drei Nodes
+(\texttt{arduino\_bridge}, \texttt{navigation}, \texttt{motor}) mit
+korrekten Parametern startet -- ein Befehl für den kompletten Stack.
+\end{lernziele}
+
+\section{Situation}
+
+Drei Terminal-Fenster für drei Nodes -- das ist kein Deployment.
+\texttt{start\_roboter.sh} aus Band~1 hat dieses Problem gelöst.
+ROS2 löst es sauberer: mit Launch-Dateien,
+die Parameter, Namespaces und Log-Level kennen.
+
+\begin{aufgabeBox}
+Schreibe \texttt{stufe2\_ros2/launch/roboter.launch.py},
+das alle drei Nodes startet und \texttt{sensor\_config.yaml} übergibt.
+\end{aufgabeBox}
+
+\begin{lstlisting}
+# stufe2_ros2/launch/roboter.launch.py
+"""Launch-Datei für den vollständigen robotik-uno-q Stack."""
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from pathlib import Path
+
+PAKET = 'robotik_uno_q'
+CONFIG = Path(__file__).parent.parent / 'config' / 'sensor_config.yaml'
+
+def generate_launch_description() -> LaunchDescription:
+    port_arg = DeclareLaunchArgument(
+        'port',
+        default_value='/dev/arduino',
+        description='Serial-Port des Arduino'
+    )
+
+    arduino_bridge = Node(
+        package=PAKET,
+        executable='arduino_bridge_node',
+        name='arduino_bridge',
+        parameters=[str(CONFIG), {'port': LaunchConfiguration('port')}],
+        output='screen',
+    )
+
+    navigation = Node(
+        package=PAKET,
+        executable='navigation_node',
+        name='navigation',
+        parameters=[str(CONFIG)],
+        output='screen',
+    )
+
+    motor = Node(
+        package=PAKET,
+        executable='motor_node',
+        name='motor',
+        parameters=[str(CONFIG), {'port': LaunchConfiguration('port')}],
+        output='screen',
+    )
+
+    return LaunchDescription([
+        port_arg,
+        arduino_bridge,
+        navigation,
+        motor,
+    ])
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# Stack starten
+ros2 launch robotik_uno_q roboter.launch.py
+
+# Mit anderem Port:
+ros2 launch robotik_uno_q roboter.launch.py port:=/dev/ttyACM0
+
+# Node-Graph anzeigen
+rqt_graph
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{roboter.launch.py} -- ein Befehl startet den kompletten Stack.\\
+\textbf{Teil~IV:} Alles zusammensetzen -- vollständige Implementierung.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{generate\_launch\_description()} gibt die Liste aller zu startenden Actions zurück.
+\texttt{DeclareLaunchArgument} + \texttt{LaunchConfiguration} machen Parameter
+über die Kommandozeile überschreibbar.
+Launch-Dateien ersetzen \texttt{start\_roboter.sh} -- aber das Shell-Skript
+bleibt für Docker-Umgebungen nützlich.
+\end{merksatzBox}
+
+\begin{haubeBox}
+\textbf{Warum Python statt XML für Launch-Dateien?}
+
+ROS1 verwendete XML-Launch-Dateien (\texttt{.launch}).
+Sie waren einfach, aber unflexibel: keine Schleifen,
+keine bedingten Ausdrücke, keine Imports.
+ROS2 führte Python-Launch-Dateien ein -- volle Programmierbarkeit,
+Zugriff auf das Filesystem, bedingte Nodes, Schleifen über Node-Listen.
+XML-Launch-Dateien gibt es in ROS2 noch, aber die Python-API ist Standard.
+\end{haubeBox}
