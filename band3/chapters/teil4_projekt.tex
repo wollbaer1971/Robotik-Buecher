@@ -1,0 +1,507 @@
+%% ============================================================
+%% Teil IV: Das Projekt – vollständige C++-Implementierung
+%% Band 3 – Kapitel 12 bis 13
+%% ============================================================
+
+\part{Das Projekt}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir bauen motor\_node in C++ –
+  Lifecycle, Serial und Service komplett}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du implementierst den vollständigen \texttt{motor\_node.cpp}
+als rclcpp-Lifecycle-Node mit Serial-Kommunikation,
+\texttt{/cmd\_vel}-Subscriber, \texttt{/motor/stopp}-Service
+und korrekter State~Machine.
+\end{lernziele}
+
+\section{Situation}
+
+In den vorangehenden Kapiteln wurden alle Teile einzeln entwickelt.
+Jetzt kommen sie zusammen:
+Lifecycle~Node + Serial-Port + Subscriber + Service = der vollständige \texttt{motor\_node}.
+
+\begin{aufgabeBox}
+Implementiere \texttt{motor\_node.cpp} vollständig.
+Er soll nach \texttt{ros2 lifecycle set /motor activate}
+auf \texttt{/cmd\_vel} reagieren und den Arduino ansteuern.
+\end{aufgabeBox}
+
+\section{motor\_node.hpp}
+
+\begin{lstlisting}[style=cpp]
+// include/robotik_uno_q_cpp/motor_node.hpp
+#pragma once
+
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_lifecycle/lifecycle_node.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <std_srvs/srv/trigger.hpp>
+
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+
+namespace robotik_uno_q {
+
+class MotorNode : public rclcpp_lifecycle::LifecycleNode {
+public:
+    explicit MotorNode(const rclcpp::NodeOptions& opts = rclcpp::NodeOptions{});
+    ~MotorNode() override;
+
+    using CallbackReturn =
+        rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+
+    CallbackReturn on_configure(const rclcpp_lifecycle::State&) override;
+    CallbackReturn on_activate(const rclcpp_lifecycle::State&) override;
+    CallbackReturn on_deactivate(const rclcpp_lifecycle::State&) override;
+    CallbackReturn on_cleanup(const rclcpp_lifecycle::State&) override;
+    CallbackReturn on_shutdown(const rclcpp_lifecycle::State&) override;
+
+private:
+    // ─── Parameter ───────────────────────────────────────────────────────
+    std::string port_{"/dev/arduino"};
+    int         baudrate_{9600};
+    float       vmax_{0.5f};   // m/s: maximale Translationsgeschwindigkeit
+    float       spurbreite_{0.165f};  // Meter
+
+    // ─── Serial ──────────────────────────────────────────────────────────
+    int         fd_{-1};      // File Descriptor des Serial-Ports (POSIX)
+    std::mutex  serial_mutex_;
+
+    // ─── ROS2-Handles ────────────────────────────────────────────────────
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_cmd_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr         srv_stopp_;
+
+    // ─── State ───────────────────────────────────────────────────────────
+    std::atomic<bool> motoren_aktiv_{false};
+
+    // ─── Private Methoden ────────────────────────────────────────────────
+    bool _oeffne_serial(const std::string& port, int baud);
+    void _schliesse_serial();
+    bool _sende(const std::string& befehl);
+
+    void _cb_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr& msg);
+    void _cb_stopp(
+        const std_srvs::srv::Trigger::Request::SharedPtr&,
+        std_srvs::srv::Trigger::Response::SharedPtr&);
+
+    static std::pair<int, int> _twist_zu_pwm(
+        float vx, float wz, float vmax, float spurbreite);
+};
+
+}  // namespace robotik_uno_q
+\end{lstlisting}
+
+\section{motor\_node.cpp -- vollständige Implementierung}
+
+\begin{lstlisting}[style=cpp]
+// src/motor_node.cpp
+#include "robotik_uno_q_cpp/motor_node.hpp"
+
+#include <fcntl.h>
+#include <termios.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <cmath>
+#include <format>
+#include <stdexcept>
+#include <string>
+
+namespace robotik_uno_q {
+
+// ─── Konstruktor / Destruktor ─────────────────────────────────────────────
+
+MotorNode::MotorNode(const rclcpp::NodeOptions& opts)
+    : LifecycleNode("motor", opts)
+{
+    // Parameter deklarieren (Defaults wie in Python-Version)
+    this->declare_parameter("port",      port_);
+    this->declare_parameter("baudrate",  baudrate_);
+    this->declare_parameter("vmax",      vmax_);
+    this->declare_parameter("spurbreite", spurbreite_);
+
+    // Service: immer erreichbar, unabhängig vom Lifecycle-State
+    srv_stopp_ = this->create_service<std_srvs::srv::Trigger>(
+        "/motor/stopp",
+        [this](const std_srvs::srv::Trigger::Request::SharedPtr& req,
+               std_srvs::srv::Trigger::Response::SharedPtr&      res) {
+            this->_cb_stopp(req, res);
+        });
+
+    RCLCPP_INFO(get_logger(),
+        "MotorNode erstellt. Service /motor/stopp aktiv. "
+        "Warte auf 'configure'...");
+}
+
+MotorNode::~MotorNode() {
+    _schliesse_serial();
+}
+
+// ─── Lifecycle-Callbacks ──────────────────────────────────────────────────
+
+MotorNode::CallbackReturn
+MotorNode::on_configure(const rclcpp_lifecycle::State&)
+{
+    // Parameter lesen
+    port_       = this->get_parameter("port").as_string();
+    baudrate_   = this->get_parameter("baudrate").as_int();
+    vmax_       = static_cast<float>(this->get_parameter("vmax").as_double());
+    spurbreite_ = static_cast<float>(this->get_parameter("spurbreite").as_double());
+
+    RCLCPP_INFO(get_logger(),
+        "Konfiguriere: port=%s, baudrate=%d", port_.c_str(), baudrate_);
+
+    // Serial-Port öffnen
+    if (!_oeffne_serial(port_, baudrate_)) {
+        RCLCPP_ERROR(get_logger(), "Serial-Port nicht erreichbar: %s", port_.c_str());
+        return CallbackReturn::FAILURE;
+    }
+
+    // Subscriber erstellen
+    sub_cmd_ = this->create_subscription<geometry_msgs::msg::Twist>(
+        "/cmd_vel", rclcpp::QoS(10).reliable(),
+        [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+            this->_cb_cmd_vel(msg);
+        });
+
+    RCLCPP_INFO(get_logger(), "Konfiguriert. Bereit fuer 'activate'.");
+    return CallbackReturn::SUCCESS;
+}
+
+MotorNode::CallbackReturn
+MotorNode::on_activate(const rclcpp_lifecycle::State&)
+{
+    // Stopp-Befehl senden, dann Motoren freigeben
+    _sende("S\n");
+    motoren_aktiv_.store(true);
+    RCLCPP_INFO(get_logger(), "AKTIVIERT: Motoren bereit.");
+    return CallbackReturn::SUCCESS;
+}
+
+MotorNode::CallbackReturn
+MotorNode::on_deactivate(const rclcpp_lifecycle::State&)
+{
+    motoren_aktiv_.store(false);
+    _sende("S\n");
+    RCLCPP_INFO(get_logger(), "Deaktiviert: Motoren gestoppt.");
+    return CallbackReturn::SUCCESS;
+}
+
+MotorNode::CallbackReturn
+MotorNode::on_cleanup(const rclcpp_lifecycle::State&)
+{
+    sub_cmd_.reset();
+    _schliesse_serial();
+    RCLCPP_INFO(get_logger(), "Bereinigt.");
+    return CallbackReturn::SUCCESS;
+}
+
+MotorNode::CallbackReturn
+MotorNode::on_shutdown(const rclcpp_lifecycle::State&)
+{
+    motoren_aktiv_.store(false);
+    _sende("S\n");
+    _schliesse_serial();
+    return CallbackReturn::SUCCESS;
+}
+
+// ─── Private Methoden ─────────────────────────────────────────────────────
+
+bool MotorNode::_oeffne_serial(const std::string& port, int baud) {
+    fd_ = ::open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+    if (fd_ < 0) return false;
+
+    termios tty{};
+    ::tcgetattr(fd_, &tty);
+    speed_t speed = (baud == 115200) ? B115200 : B9600;
+    ::cfsetospeed(&tty, speed);
+    ::cfsetispeed(&tty, speed);
+    tty.c_cflag = CS8 | CREAD | CLOCAL;
+    tty.c_iflag = IGNPAR;
+    tty.c_oflag = 0;
+    tty.c_lflag = 0;
+    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VTIME] = 10;  // 1s Timeout
+    ::tcflush(fd_, TCIFLUSH);
+    ::tcsetattr(fd_, TCSANOW, &tty);
+    return true;
+}
+
+void MotorNode::_schliesse_serial() {
+    std::lock_guard<std::mutex> lock(serial_mutex_);
+    if (fd_ >= 0) {
+        ::close(fd_);
+        fd_ = -1;
+    }
+}
+
+bool MotorNode::_sende(const std::string& befehl) {
+    std::lock_guard<std::mutex> lock(serial_mutex_);
+    if (fd_ < 0) return false;
+    ssize_t n = ::write(fd_, befehl.c_str(), befehl.size());
+    return n == static_cast<ssize_t>(befehl.size());
+}
+
+void MotorNode::_cb_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr& msg) {
+    if (!motoren_aktiv_.load()) return;
+
+    auto [pwm_r, pwm_l] = _twist_zu_pwm(
+        static_cast<float>(msg->linear.x),
+        static_cast<float>(msg->angular.z),
+        vmax_, spurbreite_);
+
+    // Format aus Band 1: "V 150 150\n"
+    std::string befehl = std::format("V {} {}\n", pwm_r, pwm_l);
+    if (!_sende(befehl)) {
+        RCLCPP_WARN(get_logger(), "Serial-Sendefehler: %s", befehl.c_str());
+    }
+}
+
+void MotorNode::_cb_stopp(
+    const std_srvs::srv::Trigger::Request::SharedPtr&,
+    std_srvs::srv::Trigger::Response::SharedPtr& res)
+{
+    RCLCPP_WARN(get_logger(), "NOTBREMSE!");
+    motoren_aktiv_.store(false);
+    bool ok = _sende("S\n");
+    res->success = ok;
+    res->message = ok ? "Gestoppt." : "Serial-Fehler.";
+}
+
+std::pair<int, int> MotorNode::_twist_zu_pwm(
+    float vx, float wz, float vmax, float spurbreite)
+{
+    float v_r = vx + (spurbreite / 2.0f) * wz;
+    float v_l = vx - (spurbreite / 2.0f) * wz;
+    auto  clamp_pwm = [vmax](float v) -> int {
+        return static_cast<int>(std::clamp(v / vmax, -1.0f, 1.0f) * 255.0f);
+    };
+    return {clamp_pwm(v_r), clamp_pwm(v_l)};
+}
+
+}  // namespace robotik_uno_q
+
+// ─── main ─────────────────────────────────────────────────────────────────
+
+int main(int argc, char* argv[]) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<robotik_uno_q::MotorNode>();
+
+    rclcpp::executors::StaticSingleThreadedExecutor executor;
+    executor.add_node(node->get_node_base_interface());
+    executor.spin();
+
+    rclcpp::shutdown();
+    return 0;
+}
+\end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[language=bash]
+# Bauen
+cd ~/ros2_ws
+colcon build --packages-select robotik_uno_q_cpp
+source install/setup.bash
+
+# Starten
+ros2 run robotik_uno_q_cpp motor_node
+
+# Lifecycle-Transitionen
+ros2 lifecycle set /motor configure
+ros2 lifecycle set /motor activate
+
+# Python-Node published, C++-Node empfängt
+ros2 run robotik_uno_q navigation_node
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{motor\_node.cpp} vollständig implementiert.\\
+\textbf{Nächstes Kapitel:} Hybrides Deployment -- Python und C++ zusammen.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+POSIX-Serial (\texttt{open}/\texttt{write}/\texttt{close}) statt libserial
+für maximale Kontrolle.
+\texttt{std::format} (C++20) statt \texttt{sprintf} für String-Formatierung.
+\texttt{std::pair<int,int>} für Rückgabe zweier Werte ohne Overhead.
+Namespace \texttt{robotik\_uno\_q} für alle eigenen Klassen.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Python und C++ zusammen –
+  hybrides Deployment}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du startest den vollständigen Stack mit Python-Nodes (Band~2)
+und C++-Nodes (Band~3) gemeinsam, aktualisierst die Launch-Datei
+und führst einen vollständigen Systemtest durch.
+\end{lernziele}
+
+\section{Situation}
+
+Band~2 hat Python-Nodes.
+Band~3 hat C++-Nodes.
+Jetzt laufen beide zusammen -- in einem Workspace,
+einer Launch-Datei, einem ROS2-Domain.
+
+\begin{aufgabeBox}
+Aktualisiere \texttt{roboter.launch.py} aus Band~2 so,
+dass \texttt{motor\_node} die C++-Version aus \texttt{robotik\_uno\_q\_cpp} startet.
+Führe einen vollständigen Systemtest durch.
+\end{aufgabeBox}
+
+\section{Aktualisierte Launch-Datei}
+
+\begin{lstlisting}
+# stufe2_ros2/launch/roboter.launch.py -- Version 2.0
+"""Gemischter Stack: Python arduino_bridge + navigation, C++ motor."""
+
+from launch import LaunchDescription
+from launch_ros.actions import Node, LifecycleNode
+
+PYTHON_PKG = 'robotik_uno_q'
+CPP_PKG    = 'robotik_uno_q_cpp'
+CONFIG     = '...'  # wie in Band 2
+
+def generate_launch_description() -> LaunchDescription:
+    arduino_bridge = Node(
+        package=PYTHON_PKG,
+        executable='arduino_bridge_node',
+        name='arduino_bridge',
+        parameters=[CONFIG],
+        output='screen',
+    )
+
+    navigation = Node(
+        package=PYTHON_PKG,
+        executable='navigation_node',
+        name='navigation',
+        parameters=[CONFIG],
+        output='screen',
+    )
+
+    # C++ motor_node als LifecycleNode starten
+    motor = LifecycleNode(
+        package=CPP_PKG,
+        executable='motor_node',
+        name='motor',
+        namespace='',
+        parameters=[CONFIG],
+        output='screen',
+    )
+
+    return LaunchDescription([arduino_bridge, navigation, motor])
+\end{lstlisting}
+
+\section{Lifecycle-Transitionen in der Launch-Datei}
+
+\begin{lstlisting}
+from launch_ros.actions import LifecycleNode
+from launch.actions import EmitEvent, RegisterEventHandler
+from launch_ros.events.lifecycle import ChangeState
+from launch_ros.event_handlers import OnStateTransition
+import lifecycle_msgs.msg
+
+def generate_launch_description():
+    motor = LifecycleNode(...)
+
+    # Nach configure automatisch activate
+    aktiviere = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=motor,
+            goal_state='inactive',
+            entities=[
+                EmitEvent(event=ChangeState(
+                    lifecycle_node_matcher=...,
+                    transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE
+                ))
+            ]
+        )
+    )
+    return LaunchDescription([motor, aktiviere])
+\end{lstlisting}
+
+\section{Vollständiger Systemtest}
+
+\begin{loesungBox}
+\begin{lstlisting}[language=bash]
+# Beide Pakete bauen
+cd ~/ros2_ws
+colcon build
+source install/setup.bash
+
+# Stack starten (Arduino angesteckt!)
+ros2 launch robotik_uno_q roboter.launch.py
+
+# In separaten Terminals prüfen:
+
+# 1. Alle Nodes aktiv?
+ros2 node list
+# /arduino_bridge  /navigation  /motor
+
+# 2. Topics fließen?
+ros2 topic hz /sensor/rechts     # ~10 Hz
+ros2 topic hz /cmd_vel           # ~10 Hz
+
+# 3. Lifecycle-State des C++-Nodes
+ros2 lifecycle get /motor
+# - State: active [3]
+
+# 4. Notbremse testen
+ros2 service call /motor/stopp std_srvs/srv/Trigger
+# response: success=True, message='Gestoppt.'
+
+# 5. Sprachen des Node-Graphs überprüfen
+ros2 node info /arduino_bridge   # Python
+ros2 node info /motor            # C++
+
+# 6. Roboter fährt autonom -- Hindernis vor den Sensor halten!
+ros2 topic echo /cmd_vel --once
+# linear: x: 0.0, angular: z: 0.0   <- Stopp bei <25 cm
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand nach Band~3]
+\begin{tabular}{lll}
+\hline
+\textbf{Node} & \textbf{Sprache} & \textbf{Aufgabe} \\
+\hline
+\texttt{arduino\_bridge} & Python~3 / rclpy & Serial lesen, Range publishen \\
+\texttt{navigation}      & Python~3 / rclpy & cmd\_vel entscheiden \\
+\texttt{motor}           & C++17 / rclcpp  & Lifecycle, Serial, Notbremse \\
+\hline
+\end{tabular}
+
+\bigskip
+\textbf{Nächster Band:} ROS2 vertieft -- SLAM, Nav2, micro-ROS.
+Der Roboter bekommt eine Karte, plant Routen
+und navigiert vollständig autonom.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+Python und C++ coexistieren im gleichen ROS2-Stack.
+Sprachunterschiede sind für andere Nodes unsichtbar --
+sie sehen nur Topics, Services und Lifecycle-States.
+Das ist die Stärke von ROS2: sauber getrennte Verantwortlichkeiten,
+sprach- und prozessübergreifend.
+\end{merksatzBox}
+
+\begin{robotikBox}
+Das Hybridmodell ist in der Industrie Standard:
+Nav2 (C++), ros2\_control (C++),
+Anwendungs-Nodes und Testskripte (Python).
+Wer beide Sprachen beherrscht und weiß, wann welche passt,
+kann jeden ROS2-Stack lesen, debuggen und erweitern.
+Das ist das Ziel dieser zwei Bände.
+\end{robotikBox}
