@@ -1,0 +1,366 @@
+%% ============================================================
+%% Teil II: Robotik-Bibliotheken – NumPy, Matplotlib, OpenCV-Vorschau
+%% Band 2 – Kapitel 6 bis 8
+%% ============================================================
+
+\part{Robotik-Bibliotheken}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Sensordaten filtern – NumPy für Robotik}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kannst NumPy-Arrays für Sensor-Puffer einsetzen,
+Mittelwerte und gleitende Fenster berechnen und weißt,
+wann NumPy sich lohnt -- und wann einfaches Python reicht.
+\end{lernziele}
+
+\section{Situation}
+
+Der HC-SR04 misst unruhig: 87, 91, 84, 88, 200 (Ausreißer!), 86, 89\,cm.
+Ein einzelner Messwert ist unzuverlässig.
+Für robuste Navigation braucht \texttt{navigation\_node}
+gefilterte Werte -- Mittelwert, Median oder gleitendes Fenster.
+
+\begin{aufgabeBox}
+Implementiere einen Sensor-Puffer mit gleitendem Mittelwert
+und Ausreißer-Filterung für den \texttt{arduino\_bridge\_node}.
+Verwende NumPy für die Berechnung.
+\end{aufgabeBox}
+
+\section{Warum NumPy?}
+
+\begin{wissenBox}
+NumPy speichert Zahlen in kompakten C-Arrays -- nicht als Python-Objekte.
+Operationen laufen als optimierter C-Code.
+Für 1000 Messungen ist \texttt{np.mean(arr)} ca. 100-mal schneller
+als eine Python-\texttt{for}-Schleife.
+
+\begin{lstlisting}
+import numpy as np
+
+# Python-Schleife: langsam bei vielen Werten
+messwerte = [87, 91, 84, 88, 86, 89]
+mittelwert = sum(messwerte) / len(messwerte)   # 87.5
+
+# NumPy: schnell, präzise, mehr Werkzeuge
+arr = np.array(messwerte, dtype=np.float32)
+np.mean(arr)    # 87.5
+np.median(arr)  # 87.5 -- robust gegen Ausreißer
+np.std(arr)     # Standardabweichung
+np.clip(arr, 2, 400)  # Werte begrenzen: min=2cm, max=400cm
+\end{lstlisting}
+
+\textbf{Wann NumPy sich lohnt:} mehr als 100 Werte gleichzeitig,
+Matrizenrechnung (Transformationen, Odometrie),
+Bild-Arrays (OpenCV gibt numpy-Arrays zurück).
+
+\textbf{Wann Python reicht:} einzelne Messwerte,
+einfache Schwellenwertabfragen wie in \texttt{motor\_bridge.py}.
+\end{wissenBox}
+
+\subsection{Gleitender Mittelwert mit \texttt{deque} + NumPy}
+
+\begin{lstlisting}
+from collections import deque
+import numpy as np
+
+class SensorPuffer:
+    """Gleitender Mittelwert über die letzten N Messungen."""
+
+    def __init__(self, fenstergroesse: int = 5) -> None:
+        self._puffer_rechts: deque[int] = deque(maxlen=fenstergroesse)
+        self._puffer_links:  deque[int] = deque(maxlen=fenstergroesse)
+
+    def hinzufuegen(self, rechts_cm: int, links_cm: int) -> None:
+        self._puffer_rechts.append(rechts_cm)
+        self._puffer_links.append(links_cm)
+
+    def gefilterter_wert(self) -> tuple[float, float]:
+        """Gibt Median beider Sensoren zurück (robust gegen Ausreißer)."""
+        if not self._puffer_rechts:
+            return 0.0, 0.0
+        r = float(np.median(np.array(self._puffer_rechts, dtype=np.float32)))
+        l = float(np.median(np.array(self._puffer_links,  dtype=np.float32)))
+        return r, l
+
+    def ist_bereit(self) -> bool:
+        """Puffer muss mindestens halb voll sein."""
+        return len(self._puffer_rechts) >= self._puffer_rechts.maxlen // 2
+\end{lstlisting}
+
+\subsection{Integration in den Node}
+
+\begin{lstlisting}
+class ArduinoBridgeNode(Node):
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+        self._puffer = SensorPuffer(fenstergroesse=5)
+        self._timer = self.create_timer(0.1, self._lese_arduino)
+
+    def _lese_arduino(self) -> None:
+        daten = self._lese_serielle_zeile()
+        if daten is None:
+            return
+        self._puffer.hinzufuegen(daten.rechts_cm, daten.links_cm)
+        if self._puffer.ist_bereit():
+            r, l = self._puffer.gefilterter_wert()
+            # In Teil III: hier publishen
+            self.get_logger().debug(f"Gefiltert: R={r:.1f}cm L={l:.1f}cm")
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{SensorPuffer} mit gleitendem Median.
+Ausreißer wie "`200\,cm"' werden herausgefiltert.\\
+\textbf{Nächstes Kapitel:} Sensordaten live visualisieren.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} \texttt{np.median()} ist robuster als \texttt{np.mean()} --
+ein Ausreißer beeinflusst den Median kaum,
+den Mittelwert dagegen stark.
+\texttt{collections.deque(maxlen=N)} ist perfekt für gleitende Fenster:
+alte Werte fallen automatisch heraus.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{np.array([87, "N/A"])} → \texttt{dtype=object},
+  keine Rechenoperationen möglich.
+  Validiere immer vor dem Einfügen in den Puffer.
+\item NumPy für einzelne skalare Werte:
+  \texttt{np.mean([87])} ist langsamer als \texttt{87.0} -- Overhead lohnt sich erst ab ~50 Werten.
+\item \texttt{deque} ohne \texttt{maxlen}: wächst unbegrenzt -- Memory-Leak im Dauerbetrieb.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{uebungBox}
+\begin{enumerate}
+\item Erweitere \texttt{SensorPuffer} um eine Methode \texttt{ausreisser\_erkannt()},
+  die \texttt{True} zurückgibt, wenn der letzte Wert mehr als 2 Standardabweichungen
+  vom Mittelwert abweicht.
+\item Miss die Ausführungszeit von \texttt{gefilterter\_wert()} mit \texttt{timeit}
+  für Fenstergrößen von 5, 50 und 500.
+\item Welche Fenstergröße macht bei 10\,Hz Sensor-Rate und 1\,Hz Navigation Sinn?
+  Begründe.
+\end{enumerate}
+\end{uebungBox}
+
+\begin{haubeBox}
+\textbf{NumPy und die GIL}
+
+Der Python Global Interpreter Lock (GIL) verhindert echte
+Parallelität in Python-Threads. NumPy-Operationen laufen
+jedoch als C-Code -- und C-Code gibt die GIL frei.
+\texttt{np.median()} auf einem großen Array blockiert andere Threads nicht.
+Das macht NumPy besonders wertvoll in ROS2-Nodes,
+die Timer- und Subscriber-Callbacks gleichzeitig bedienen.
+\end{haubeBox}
+
+\begin{robotikBox}
+In ROS2 liefert \texttt{sensor\_msgs/LaserScan} 360~oder mehr Entfernungswerte
+als \texttt{float32[]}-Array -- direkt als NumPy-Array nutzbar.
+Das gleiche Filtermuster (\texttt{np.median()}, \texttt{np.clip()})
+funktioniert für Lidar, Kamera-Tiefeninformation und IMU-Daten.
+\end{robotikBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Sensordaten visualisieren – Matplotlib live}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kannst Sensor-Zeitreihen live plotten,
+weißt warum rviz2 für ROS2-Nodes die bessere Alternative ist
+und kennst den Einsatzbereich von Matplotlib in der Robotik.
+\end{lernziele}
+
+\section{Situation}
+
+Beim Debuggen willst du sehen, wie die HC-SR04-Rohdaten
+im Vergleich zum gefilterten Wert aussehen --
+nicht als Zahlenkolonne im Terminal,
+sondern als Kurve.
+
+\begin{aufgabeBox}
+Erstelle ein Standalone-Diagnosewerkzeug, das Rohdaten und gefilterte
+Abstandswerte des HC-SR04 live plottet.
+Das Tool läuft neben dem ROS2-Node, nicht als Node selbst.
+\end{aufgabeBox}
+
+\section{Matplotlib für Offline-Analyse}
+
+\begin{lstlisting}
+#!/usr/bin/env python3
+# stufe2_ros2/tools/sensor_plotter.py
+"""Live-Plot der HC-SR04-Rohdaten aus einer Log-CSV."""
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import csv
+import time
+from collections import deque
+
+MAX_PUNKTE = 100
+zeitreihe:  deque[float] = deque(maxlen=MAX_PUNKTE)
+rechts_roh: deque[float] = deque(maxlen=MAX_PUNKTE)
+links_roh:  deque[float] = deque(maxlen=MAX_PUNKTE)
+
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.set_title("HC-SR04 Abstandsdaten – robotik-uno-q")
+ax.set_xlabel("Zeit (s)")
+ax.set_ylabel("Abstand (cm)")
+ax.set_ylim(0, 420)
+ax.axhline(y=25, color='red',    linestyle='--', label='Stopp (25 cm)')
+ax.axhline(y=50, color='orange', linestyle='--', label='Warn (50 cm)')
+
+linie_r, = ax.plot([], [], 'b-',  label='Rechts (roh)',      linewidth=1)
+linie_l, = ax.plot([], [], 'g-',  label='Links (roh)',       linewidth=1)
+ax.legend(loc='upper right')
+
+def aktualisiere(frame: int) -> list:
+    """Liest neue Zeilen aus der Log-CSV und aktualisiert den Plot."""
+    try:
+        with open('logs/sensor.csv', 'r') as f:
+            zeilen = list(csv.reader(f))[-MAX_PUNKTE:]
+        for ts, r, l in zeilen:
+            zeitreihe.append(float(ts))
+            rechts_roh.append(float(r))
+            links_roh.append(float(l))
+    except (FileNotFoundError, ValueError):
+        pass
+
+    linie_r.set_data(range(len(rechts_roh)), list(rechts_roh))
+    linie_l.set_data(range(len(links_roh)),  list(links_roh))
+    ax.set_xlim(0, MAX_PUNKTE)
+    return [linie_r, linie_l]
+
+ani = animation.FuncAnimation(fig, aktualisiere, interval=200, blit=True)
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\section{rviz2 -- die bessere Alternative im ROS2-Kontext}
+
+\begin{haubeBox}
+\textbf{Matplotlib vs. rviz2: wann was?}
+
+Matplotlib eignet sich für:
+\begin{itemize}
+\item Offline-Analyse von aufgezeichneten Daten
+\item Einfache Zeitreihen außerhalb von ROS2
+\item Berichte, Präsentationen, Paper
+\end{itemize}
+
+rviz2 eignet sich für:
+\begin{itemize}
+\item Live-Visualisierung von ROS2-Topics
+\item 3D-Koordinatensysteme, Robotermodelle, Laserscans
+\item Wegpunkte und Navigation
+\end{itemize}
+
+\textbf{Faustregel:} Wenn der Roboter läuft: rviz2.
+Wenn du Daten nachträglichanalysierst: Matplotlib.
+\end{haubeBox}
+
+\begin{lstlisting}[language=bash]
+# rviz2 starten (im ROS2-Container)
+source /opt/ros/jazzy/setup.bash
+rviz2
+
+# In rviz2: Add → By topic → /sensor/rechts → Range
+# Zeigt den Sensor live als 3D-Kegel
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{tools/sensor\_plotter.py} als Diagnosewerkzeug.\\
+\textbf{Nächstes Kapitel:} Kamera-Anbindung -- Vorschau auf Band~5.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} Matplotlib für Offline-Analyse, rviz2 für Live-Daten in ROS2.
+Beide Werkzeuge haben ihren Platz -- das \texttt{tools/}-Verzeichnis
+ist genau für solche Hilfswerkzeuge gedacht.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Vorschau: Kamera als Sensor – OpenCV und Band~5}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du weißt, wie eine Kamera in Python angesprochen wird,
+verstehst den Zusammenhang zwischen OpenCV-Arrays
+und ROS2-Bildnachrichten und weißt, was in Band~5 folgt.
+\end{lernziele}
+
+\section{Situation}
+
+Ein Ultraschallsensor sieht nur geradeaus.
+Für autonome Navigation -- Schilder lesen, Objekte erkennen,
+Personen verfolgen -- braucht der Roboter eine Kamera.
+
+\begin{aufgabeBox}
+Lese ein einzelnes Bild von einer USB-Kamera,
+zeige es an und verstehe, wie ROS2 Kamerabilder überträgt.
+Diese Einheit ist eine Vorschau -- die vollständige Bildverarbeitung
+folgt in Band~5 (Embedded AI).
+\end{aufgabeBox}
+
+\section{OpenCV: das Fundament}
+
+\begin{lstlisting}
+import cv2
+import numpy as np
+
+# Kamera öffnen (Index 0 = erste Kamera)
+kamera = cv2.VideoCapture(0)
+
+ret, bild = kamera.read()
+# bild ist ein numpy-Array: shape = (480, 640, 3) -- H x W x BGR
+
+# Graustufen
+grau = cv2.cvtColor(bild, cv2.COLOR_BGR2GRAY)
+
+# Anzeigen
+cv2.imshow("Kamera", bild)
+cv2.waitKey(0)
+
+kamera.release()
+cv2.destroyAllWindows()
+\end{lstlisting}
+
+\section{ROS2 und Kamerabilder}
+
+\begin{wissenBox}
+ROS2 überträgt Kamerabilder als \texttt{sensor\_msgs/Image}.
+Das \texttt{cv\_bridge}-Paket konvertiert zwischen
+OpenCV-numpy-Arrays und ROS2-Nachrichten:
+
+\begin{lstlisting}
+from cv_bridge import CvBridge
+import cv2
+
+bridge = CvBridge()
+
+# numpy -> ROS2
+ros_bild = bridge.cv2_to_imgmsg(bild, encoding="bgr8")
+
+# ROS2 -> numpy
+bild = bridge.imgmsg_to_cv2(ros_bild, desired_encoding="bgr8")
+\end{lstlisting}
+
+In Band~5 kommt YOLO dazu: Das Erkennungsmodell läuft auf dem
+numpy-Array und gibt Bounding-Boxes zurück.
+\end{wissenBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Kamera-Grundkenntnisse als Vorschau.\\
+\textbf{Teil~III:} rclpy -- der eigentliche ROS2-Einstieg beginnt jetzt.
+\end{projektBox}
+
+\begin{robotikBox}
+Band~5 (Embedded AI) baut direkt auf diesem Kapitel auf:
+USB-Kamera → OpenCV → YOLO-Erkennung → ROS2-Topic \texttt{/kamera/erkennung}.
+Der Roboter wird dann nicht nur Hindernissen ausweichen,
+sondern auch Personen, Schilder und Objekte erkennen.
+\end{robotikBox}
