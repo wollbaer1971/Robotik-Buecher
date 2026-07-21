@@ -1,0 +1,323 @@
+%% ============================================================
+%% Teil IV: Das Projekt – vollständige Implementierung
+%% Band 2 – Kapitel 15
+%% ============================================================
+
+\part{Das Projekt}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir bauen robotik-uno-q als ROS2-Paket –
+  vom Sketch bis zum autonomen Fahren}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du baust \texttt{stufe2\_ros2/} zu einem vollständigen ROS2-Paket um,
+implementierst alle drei Nodes in ihrer finalen Form,
+verknüpfst sie über die Launch-Datei
+und führst einen vollständigen Systemtest durch.
+Am Ende fährt der Roboter autonom.
+\end{lernziele}
+
+\section{Situation}
+
+In den vorangehenden Kapiteln sind entstanden:
+\begin{itemize}
+\item \texttt{arduino\_bridge\_node}: liest Serial, published \texttt{sensor\_msgs/Range}
+\item \texttt{navigation\_node}: subscribed Sensor-Topics, published \texttt{/cmd\_vel}
+\item \texttt{motor\_node}: subscribed \texttt{/cmd\_vel}, sendet Serial-Befehle
+\item \texttt{roboter.launch.py}: startet alle drei
+\end{itemize}
+
+Jetzt fehlt noch das ROS2-Paket-Gerüst:
+\texttt{package.xml}, \texttt{setup.py} und die Eintragung
+der Nodes als Executables.
+
+\begin{aufgabeBox}
+Forme \texttt{stufe2\_ros2/} in ein vollständiges ROS2-Python-Paket um,
+installiere es mit \texttt{colcon build}
+und starte den kompletten Stack mit \texttt{ros2 launch}.
+\end{aufgabeBox}
+
+\section{ROS2-Paketstruktur}
+
+\begin{lstlisting}[language=bash]
+stufe2_ros2/                          # wird umbenannt zu robotik_uno_q/
+├── package.xml                       # Paket-Metadaten
+├── setup.py                          # Python-Paket + Executables
+├── setup.cfg
+├── resource/
+│   └── robotik_uno_q                 # Marker-Datei (leer)
+├── robotik_uno_q/
+│   ├── __init__.py
+│   ├── arduino_bridge_node.py
+│   ├── navigation_node.py
+│   ├── motor_node.py
+│   └── sensor_daten.py
+├── config/
+│   └── sensor_config.yaml
+└── launch/
+    └── roboter.launch.py
+\end{lstlisting}
+
+\section{package.xml}
+
+\begin{lstlisting}[language=XML]
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>robotik_uno_q</name>
+  <version>0.2.0</version>
+  <description>
+    ROS2-Paket für robotik-uno-q: HC-SR04-Sensoren, L298N-Motorsteuerung.
+  </description>
+  <maintainer email="w.becker@schule.de">Wolfgang Becker</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_srvs</depend>
+
+  <exec_depend>python3-pyserial</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
+\end{lstlisting}
+
+\section{setup.py}
+
+\begin{lstlisting}
+from setuptools import setup, find_packages
+from glob import glob
+
+package_name = 'robotik_uno_q'
+
+setup(
+    name=package_name,
+    version='0.2.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name,           ['package.xml']),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
+        ('share/' + package_name + '/launch', glob('launch/*.py')),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='Wolfgang Becker',
+    maintainer_email='w.becker@schule.de',
+    description='HC-SR04 + L298N als ROS2-Paket',
+    license='MIT',
+    entry_points={
+        'console_scripts': [
+            'arduino_bridge_node = robotik_uno_q.arduino_bridge_node:main',
+            'navigation_node     = robotik_uno_q.navigation_node:main',
+            'motor_node          = robotik_uno_q.motor_node:main',
+        ],
+    },
+)
+\end{lstlisting}
+
+\section{Der vollständige arduino\_bridge\_node}
+
+\begin{lstlisting}
+#!/usr/bin/env python3
+# robotik_uno_q/arduino_bridge_node.py -- Version 1.0
+"""
+ArduinoBridgeNode: Liest HC-SR04-Daten vom Arduino UNO Q
+über Serial und published sie als sensor_msgs/Range.
+"""
+
+from __future__ import annotations
+import re
+import time
+import serial
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from sensor_msgs.msg import Range
+from .sensor_daten import SensorDaten, SensorPuffer
+
+SENSOR_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1
+)
+
+class ArduinoBridgeNode(Node):
+    """Liest Serial-Daten vom Arduino und published Range-Nachrichten."""
+
+    _MUSTER = re.compile(r'R=(\d+)\s+cm\s+L=(\d+)\s+cm')
+
+    def __init__(self) -> None:
+        super().__init__('arduino_bridge')
+
+        # Parameter
+        self.declare_parameter('port',           '/dev/arduino')
+        self.declare_parameter('baudrate',       9600)
+        self.declare_parameter('puffer_groesse', 5)
+
+        self._port      = self.get_parameter('port').value
+        self._baudrate  = self.get_parameter('baudrate').value
+
+        # Publisher
+        self._pub_r = self.create_publisher(Range, '/sensor/rechts', SENSOR_QOS)
+        self._pub_l = self.create_publisher(Range, '/sensor/links',  SENSOR_QOS)
+
+        # Puffer
+        puffer = self.get_parameter('puffer_groesse').value
+        self._puffer = SensorPuffer(fenstergroesse=puffer)
+
+        # Serial-Verbindung
+        self._ser: serial.Serial | None = None
+        self._verbinde()
+
+        # Timer: 10 Hz
+        self._timer = self.create_timer(0.1, self._lese_und_publiziere)
+        self.get_logger().info(
+            f"ArduinoBridgeNode v1.0 bereit. Port={self._port}")
+
+    def _verbinde(self) -> None:
+        try:
+            self._ser = serial.Serial(
+                self._port, self._baudrate, timeout=1.0)
+            time.sleep(2.0)   # Arduino-Neustart abwarten
+            self.get_logger().info(f"Verbunden: {self._port}")
+        except serial.SerialException as e:
+            self.get_logger().error(f"Serial-Fehler: {e}")
+            self._ser = None
+
+    def _lese_und_publiziere(self) -> None:
+        if self._ser is None or not self._ser.is_open:
+            self._verbinde()
+            return
+
+        try:
+            zeile = self._ser.readline().decode('utf-8', errors='replace')
+            daten = self._parse(zeile)
+            if daten is None:
+                return
+            self._puffer.hinzufuegen(daten.rechts_cm, daten.links_cm)
+            if not self._puffer.ist_bereit():
+                return
+            r_m, l_m = self._puffer.gefilterter_wert()
+            stamp = self.get_clock().now().to_msg()
+            self._pub_r.publish(self._range_msg(r_m, 'sensor_rechts', stamp))
+            self._pub_l.publish(self._range_msg(l_m, 'sensor_links',  stamp))
+
+        except serial.SerialException as e:
+            self.get_logger().warning(f"Serial-Unterbrechung: {e}")
+            self._ser = None
+
+    def _parse(self, zeile: str) -> SensorDaten | None:
+        m = self._MUSTER.match(zeile.strip())
+        if m:
+            return SensorDaten(
+                rechts_cm=int(m.group(1)),
+                links_cm=int(m.group(2)))
+        return None
+
+    @staticmethod
+    def _range_msg(meter: float, frame: str, stamp) -> Range:
+        msg = Range()
+        msg.header.stamp    = stamp
+        msg.header.frame_id = frame
+        msg.radiation_type  = Range.ULTRASOUND
+        msg.field_of_view   = 0.26
+        msg.min_range       = 0.02
+        msg.max_range       = 4.00
+        msg.range           = float(meter) / 100.0
+        return msg
+
+    def destroy_node(self) -> None:
+        if self._ser and self._ser.is_open:
+            self._ser.close()
+        super().destroy_node()
+
+def main(args: list[str] | None = None) -> None:
+    rclpy.init(args=args)
+    node = ArduinoBridgeNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+\end{lstlisting}
+
+\section{Build und Systemtest}
+
+\begin{loesungBox}
+\begin{lstlisting}[language=bash]
+# 1. ROS2-Workspace vorbereiten
+cd ~/ros2_ws                # oder: mkdir ~/ros2_ws && cd $_
+mkdir -p src
+# robotik-uno-q/stufe2_ros2 als Symlink oder Kopie:
+ln -s ~/robotik-uno-q/stufe2_ros2 src/robotik_uno_q
+
+# 2. Paket bauen
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-select robotik_uno_q
+source install/setup.bash
+
+# 3. Stack starten (Arduino angesteckt!)
+ros2 launch robotik_uno_q roboter.launch.py
+
+# 4. Prüfen
+ros2 node list
+# /arduino_bridge  /navigation  /motor
+
+ros2 topic hz /sensor/rechts
+# average rate: 10.000
+
+ros2 topic echo /sensor/rechts --once
+
+ros2 param list /arduino_bridge
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand nach Band~2]
+\begin{tabular}{ll}
+\textbf{stufe1\_mcu/} & Arduino-Sketches (unverändert aus Band~1) \\
+\textbf{stufe2\_ros2/} & Vollständiges ROS2-Paket \texttt{robotik\_uno\_q} \\
+\quad arduino\_bridge\_node & liest HC-SR04, published Range \\
+\quad navigation\_node & entscheidet, published /cmd\_vel \\
+\quad motor\_node & sendet Serial, stellt /motor/stopp bereit \\
+\quad roboter.launch.py & startet alles mit einem Befehl \\
+\textbf{Roboter} & fährt autonom, weicht Hindernissen aus \\
+\end{tabular}
+
+\bigskip
+\textbf{Nächster Band:} C++ für Robotik und ROS2 -- \texttt{motor\_node}
+wird als C++-Lifecycle-Node neu geschrieben für bessere Echtzeiteigenschaften.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{package.xml} deklariert Abhängigkeiten.
+\texttt{setup.py entry\_points} registriert Nodes als ausführbare Befehle.
+\texttt{colcon build} kompiliert und installiert.
+\texttt{source install/setup.bash} macht die neuen Nodes für \texttt{ros2 run} sichtbar.
+\end{merksatzBox}
+
+\begin{robotikBox}
+Das Paket \texttt{robotik\_uno\_q} folgt exakt der ROS2-Konvention.
+Es kann auf GitHub veröffentlicht,
+in einem anderen Workspace geklont
+und mit \texttt{rosdep install} automatisch mit Abhängigkeiten versehen werden.
+
+In Band~3 kommt \texttt{motor\_node} als C++-Node dazu:
+Python und C++ laufen im selben Stack,
+kommunizieren über \texttt{/cmd\_vel} --
+ohne dass einer von dem anderen weiß.
+Das ist ROS2.
+\end{robotikBox}
