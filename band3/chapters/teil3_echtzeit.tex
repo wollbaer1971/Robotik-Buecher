@@ -1,0 +1,307 @@
+%% ============================================================
+%% Teil III: Echtzeit und Performance (Kapitel 9–11)
+%% Band 3 – Kapitel 9 bis 11
+%% ============================================================
+
+\part{Echtzeit und Performance}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen wissen, wann C++ lohnt –
+  Python vs. C++ für Robotik-Nodes}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kannst begründen, welcher Node in Python und welcher in C++ sinnvoller ist,
+kennst die tatsächlichen Latenz-Unterschiede
+und verstehst das Hybridmodell von robotik-uno-q.
+\end{lernziele}
+
+\section{Situation}
+
+Manche behaupten: "`Alles in C++ -- wegen Performance."'
+Andere: "`Alles in Python -- wegen Entwicklungsgeschwindigkeit."'
+Beide liegen halb falsch.
+
+\begin{aufgabeBox}
+Entscheide für \texttt{robotik-uno-q}, welcher Node
+welche Sprache braucht -- mit konkreten Messungen.
+\end{aufgabeBox}
+
+\section{Was Python langsamer macht}
+
+\begin{wissenBox}
+\textbf{Der Global Interpreter Lock (GIL):}
+Python kann nur in einem Betriebssystem-Thread gleichzeitig
+Python-Bytecode ausführen.
+Für IO-bound-Tasks (Serial lesen, warten) ist das kein Problem.
+Für CPU-bound-Tasks (1000-Hz-Regler, Bildverarbeitung) schon.
+
+\textbf{Garbage Collector:}
+Pythons Speicherverwaltung kann unvorhersehbare Pausen
+(GC-Pausen) verursachen -- typisch 1--50\,ms.
+Für Echtzeit-Regler ist das inakzeptabel.
+
+\textbf{Interpreter-Overhead:}
+Jede Python-Operation löst mehrere C-Aufrufe aus.
+Für \texttt{arduino\_bridge\_node} mit 10\,Hz ist das irrelevant.
+Für einen 1\,kHz-IMU-Regler würde es auffallen.
+\end{wissenBox}
+
+\section{Latenz-Messung: Python vs. C++}
+
+\begin{lstlisting}[language=bash]
+# Timer-Jitter messen: wie präzise ist ein 100-Hz-Timer?
+# Python (rclpy):
+ros2 run robotik_uno_q arduino_bridge_node
+ros2 topic hz /sensor/rechts --window 100
+# average rate: 9.991  -- Jitter: ~1 ms
+
+# C++ (rclcpp):
+ros2 run robotik_uno_q_cpp motor_node
+ros2 topic hz /motor/status --window 100
+# average rate: 9.999  -- Jitter: <0.1 ms
+\end{lstlisting}
+
+Bei 10\,Hz ist der Unterschied für \texttt{robotik-uno-q} nicht spürbar.
+Ab 100\,Hz wird C++ relevant.
+
+\section{Entscheidungsbaum}
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=1.8cm,
+    auto,
+    decision/.style={diamond, draw=orange!80!black, fill=orange!10,
+                     minimum width=3cm, minimum height=1cm,
+                     aspect=2, font=\small},
+    result/.style={rectangle, draw=green!60!black, fill=green!10,
+                   minimum width=3cm, font=\small}
+]
+\node[decision] (rate) {Rate > 100\,Hz?};
+\node[decision, below left=of rate, xshift=-1cm] (rt) {Echtzeit-Anforderung?};
+\node[decision, below right=of rate, xshift=1cm] (cpu) {CPU-intensiv?};
+\node[result, below of=rt, yshift=-0.5cm] (cpp1) {C++};
+\node[result, below of=cpu, yshift=-0.5cm] (py) {Python};
+\node[result, below right=of rt, xshift=0.5cm, yshift=-0.5cm] (cpp2) {C++};
+
+\draw[->] (rate) -- node[left]{Ja} (rt);
+\draw[->] (rate) -- node[right]{Nein} (cpu);
+\draw[->] (rt)   -- node[left]{Ja}  (cpp1);
+\draw[->] (rt)   -- node[right]{Nein} (cpp2);
+\draw[->] (cpu)  -- node[right]{Nein} (py);
+\draw[->] (cpu)  -- node[left]{Ja}  (cpp2);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Für robotik-uno-q:}
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{Node} & \textbf{Rate} & \textbf{Sprache} \\
+\hline
+\texttt{arduino\_bridge\_node} & 10\,Hz Serial & Python \\
+\texttt{navigation\_node}      & 10\,Hz Entscheidung & Python \\
+\texttt{motor\_node}           & 10\,Hz + Service & C++ \\
+\hline
+\end{tabular}
+\end{center}
+
+\texttt{motor\_node} in C++ nicht wegen Performance,
+sondern wegen Lifecycle~Node -- das gibt es in rclcpp vollständiger.
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Begründete Sprachentscheidung für jeden Node.\\
+\textbf{Nächstes Kapitel:} Echtzeit-Konfiguration des rclcpp-Executors.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+C++ für Rates über 100\,Hz, Echtzeit-Anforderungen und CPU-intensive Berechnungen.
+Python für alles andere -- und das ist in der Praxis die Mehrheit der Nodes.
+Das Hybridmodell ist kein Kompromiss, sondern die korrekte Architektur.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen vorhersagbare Laufzeiten –
+  Echtzeit mit rclcpp}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst, was Echtzeit bedeutet (nicht: schnell, sondern: vorhersagbar),
+konfigurierst den rclcpp-Executor für niedrigen Jitter
+und kennst die PREEMPT\_RT-Verbindung aus Band~1.
+\end{lernziele}
+
+\section{Situation}
+
+Ein Node published Steuerkommandos an 100\,Hz.
+Manchmal kommt ein Tick nach 10\,ms, manchmal nach 15\,ms, manchmal nach 8\,ms.
+Das ist kein Echtzeit-System.
+Ein Echtzeit-System liefert jeden Tick in 10\,ms~$\pm$\,0{,}1\,ms.
+
+\begin{aufgabeBox}
+Konfiguriere den \texttt{motor\_node} für minimalen Jitter:
+\texttt{StaticSingleThreadedExecutor}, Speicher-Präallokation,
+und PREEMPT\_RT-Scheduling aus Band~1.
+\end{aufgabeBox}
+
+\section{Executor-Typen in rclcpp}
+
+\begin{wissenBox}
+\textbf{SingleThreadedExecutor} (Standard):
+Alle Callbacks in einem Thread, sequenziell.
+Einfach, aber: ein langer Callback blockiert alle anderen.
+
+\textbf{MultiThreadedExecutor}:
+Callbacks in mehreren Threads parallel.
+Höherer Durchsatz, aber: Callbacks müssen thread-safe sein.
+
+\textbf{StaticSingleThreadedExecutor} (Echtzeit):
+Ähnlich Single, aber Callback-Gruppen werden einmalig beim Start
+alloziert -- keine dynamischen Allokationen zur Laufzeit.
+Das verhindert GC-artige Pausen.
+
+\begin{lstlisting}[style=cpp]
+int main(int argc, char* argv[]) {
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<MotorNode>();
+
+    // StaticSingleThreadedExecutor: keine Runtime-Allokationen
+    rclcpp::executors::StaticSingleThreadedExecutor executor;
+    executor.add_node(node->get_node_base_interface());
+    executor.spin();
+
+    rclcpp::shutdown();
+    return 0;
+}
+\end{lstlisting}
+\end{wissenBox}
+
+\section{Speicher-Präallokation}
+
+\begin{lstlisting}[style=cpp]
+// Im Konstruktor: Puffer vorab allozieren
+MotorNode() : LifecycleNode("motor") {
+    // Vector mit fester Kapazität vorab allozieren
+    // Keine Runtime-Allokation beim ersten Callback
+    puffer_.reserve(100);
+    puffer_.resize(100, 0.0f);
+}
+private:
+    std::vector<float> puffer_;  // vorab alloziert
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# PREEMPT_RT-Scheduling aus Band 1 aktivieren
+# (erfordert PREEMPT_RT-Kernel, in Band 1 Kapitel 29 eingerichtet)
+sudo chrt -f 80 ros2 run robotik_uno_q_cpp motor_node
+# -f: FIFO-Scheduling, Priorität 80 (höher = höher priorisiert)
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{motor\_node} mit \texttt{StaticSingleThreadedExecutor}.\\
+\textbf{Nächstes Kapitel:} Profiling -- Flaschenhälse finden.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+Echtzeit $\neq$ schnell. Echtzeit = vorhersagbar.
+\texttt{StaticSingleThreadedExecutor} verhindert Runtime-Allokationen.
+Speicher vorab allozieren (\texttt{reserve()}).
+PREEMPT\_RT-Kernel + \texttt{chrt} für echtes Echtzeit-Scheduling.
+\end{merksatzBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Flaschenhälse finden –
+  Profiling und Optimierung}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verwendest \texttt{ros2 topic hz}, \texttt{perf} und
+rclcpp-interne Latenz-Messung, um den Node-Stack zu profilieren
+und Engpässe zu finden.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{ros2 topic hz /cmd\_vel} zeigt 7\,Hz statt 10\,Hz.
+Irgendetwas verlangsamt den Stack.
+Profiling findet, was.
+
+\begin{aufgabeBox}
+Profiliere den \texttt{motor\_node} und finde, ob der Engpass
+im Serial-Schreiben, im Twist-Parsing oder anderswo liegt.
+\end{aufgabeBox}
+
+\section{Werkzeuge}
+
+\subsection{ros2 topic hz und delay}
+
+\begin{lstlisting}[language=bash]
+# Frequenz messen
+ros2 topic hz /cmd_vel --window 50
+# average rate: 9.87  min: 0.099  max: 0.104  std dev: 0.001
+
+# Latenz: Zeitstempel in Nachricht vs. Empfangszeitpunkt
+ros2 topic delay /cmd_vel
+# average delay: 0.003  -- 3 ms Latenz, akzeptabel
+\end{lstlisting}
+
+\subsection{Manuelle Latenz-Messung im Node}
+
+\begin{lstlisting}[style=cpp]
+void _verarbeite_twist(const Twist::SharedPtr& msg) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+
+    _sende_serial(/* ... */);
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+    if (us > 1000) {
+        RCLCPP_WARN(get_logger(), "Serial-Latenz: %ld us -- zu hoch!", us);
+    }
+}
+\end{lstlisting}
+
+\subsection{perf für System-Level-Profiling}
+
+\begin{lstlisting}[language=bash]
+# perf: CPU-Zyklen pro Funktion messen
+# (nur auf Systemen mit Perf-Support -- nicht im Container ohne --privileged)
+perf record -g ros2 run robotik_uno_q_cpp motor_node
+perf report
+# Zeigt: welche Funktion wie viel CPU-Zeit verbraucht
+\end{lstlisting}
+
+\section{Häufige Engpässe und Lösungen}
+
+\begin{center}
+\begin{tabular}{ll}
+\hline
+\textbf{Engpass} & \textbf{Lösung} \\
+\hline
+Serial-Timeout zu hoch & \texttt{timeout=0.1} statt \texttt{1.0} \\
+\texttt{dynamic\_cast} im Callback & \texttt{static\_cast} oder Template \\
+String-Formatierung im Callback & Buffer vorallozieren, \texttt{snprintf} \\
+\texttt{shared\_ptr}-Kopien & \texttt{const SharedPtr\&} statt \texttt{SharedPtr} \\
+Python-Node als Flaschenhals & zu C++ migrieren, wenn Jitter > 5\,ms \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Profiling-Werkzeuge eingesetzt, Serial-Latenz unter 500\,µs.\\
+\textbf{Teil~IV:} Das vollständige Projekt -- C++ und Python im gemeinsamen Stack.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+Immer erst messen, dann optimieren.
+\texttt{ros2 topic hz} und \texttt{delay} sind die ersten Werkzeuge.
+Manuelle \texttt{chrono}-Messung im Callback findet den Engpass im Node.
+\texttt{perf} für System-Level -- braucht Root-Rechte und echte Hardware.
+\end{merksatzBox}
