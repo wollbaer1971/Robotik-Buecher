@@ -1,31 +1,89 @@
-\documentclass[
-  11pt,
-  twoside,
-  parskip=half, headings=normal,
-  bibliography=totoc, listof=totoc
-]{scrbook}
+% !TeX program = pdflatex
+% Band 2: Python für Robotik und ROS2
+% Compiler: pdfLaTeX (Overleaf: Menu → Compiler → pdfLaTeX)
+% Main document: band2/main.tex
 
-% Gemeinsame Konfiguration (pdfLaTeX, KDP-Format)
-\input{../shared/preamble}
+\documentclass[12pt,a5paper]{book}
 
-% Band-spezifische Variablen
+% ─────────────────────────────────────────────────────────────
+%  Gemeinsame Präambel (Bände 2–4)
+% ─────────────────────────────────────────────────────────────
+\input{../shared/preamble.tex}
+
+% ─────────────────────────────────────────────────────────────
+%  Band-Variablen (werden in shared/titelseite.tex genutzt)
+% ─────────────────────────────────────────────────────────────
+\newcommand{\BuchReihe}{Robotik entwickeln lernen}
 \newcommand{\BandTitel}{Python für Robotik und ROS2}
-\newcommand{\BandUntertitel}{Grundlagen bis ROS2-Einstieg}
+\newcommand{\BandUntertitel}{Von pyserial bis rclpy -- Schritt für Schritt}
 \newcommand{\BandNummer}{2}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Erste Auflage}
 
+% ─────────────────────────────────────────────────────────────
+%  Band-2-spezifisch: Python-Listings
+% ─────────────────────────────────────────────────────────────
+\lstdefinestyle{python}{
+  language=Python,
+  morekeywords={self,True,False,None,import,from,as,with,
+                def,class,return,yield,lambda,async,await},
+  keywordstyle=\color{blue!80!black}\bfseries,
+  stringstyle=\color{orange!80!black},
+  commentstyle=\color{gray}\itshape,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+}
+\lstset{style=python}   % Python ist Default in Band 2
+
+% ─────────────────────────────────────────────────────────────
+%  Vorwort-Text für Band 2
+% ─────────────────────────────────────────────────────────────
+\newcommand{\BandVorwort}{%
+Band~1 hat die Werkstatt eingerichtet: Linux, Docker, Git, Serial-Kommunikation.
+Jetzt kommt die erste Programmiersprache, die für ROS2 wirklich zählt.
+
+Dieser Band ist kein vollständiges Python-Buch.
+Er ist das, was du für Robotik und ROS2 brauchst -- nicht mehr, nicht weniger.
+Wer Python noch nie gesehen hat, findet hier einen schnellen Einstieg.
+Wer Python kennt, überfliegt die ersten Kapitel und taucht direkt in rclpy ein.
+
+Am Ende dieses Bandes fährt \texttt{robotik-uno-q} autonom:
+Der \texttt{arduino\_bridge\_node} liest Sensordaten,
+der \texttt{navigation\_node} entscheidet die Richtung,
+der \texttt{motor\_node} sendet Befehle an den Arduino.
+Alles als echte ROS2-Nodes -- mit Publisher, Subscriber und Launch-Datei.
+}
+
+% ─────────────────────────────────────────────────────────────
+%  Dokument
+% ─────────────────────────────────────────────────────────────
 \begin{document}
 
+\input{../shared/titelseite.tex}
+
 \frontmatter
-\input{../shared/titelseite}
-
 \chapter*{Vorwort}
-Dieser Band ist in Vorbereitung.
-
-\input{../shared/frontmatter}
+\BandVorwort
+\newpage
+\input{../shared/frontmatter.tex}
 \tableofcontents
 
 \mainmatter
-\input{chapters/frontmatter}
+
+\input{chapters/teil1_python_kompakt.tex}
+\input{chapters/teil2_bibliotheken.tex}
+\input{chapters/teil3_rclpy.tex}
+\input{chapters/teil4_projekt.tex}
 
 \backmatter
+\appendix
+\chapter{Python-Schnellreferenz}
+\label{app:quickref}
+% Wird in Folgeversion ergänzt
+
+\chapter{rclpy-API-Übersicht}
+\label{app:rclpy}
+% Wird in Folgeversion ergänzt
+
 \end{document}
