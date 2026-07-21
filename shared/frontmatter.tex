@@ -1,35 +1,40 @@
 %% ============================================================
 %% shared/frontmatter.tex – Bandreihen-Übersicht
-%% Wird von allen Bänden via \input{../shared/frontmatter.tex} eingebunden
+%% Einbindung: \input{../shared/frontmatter.tex}  (alle Bände)
 %% ============================================================
 
 \chapter*{Die Buchreihe}
 \addcontentsline{toc}{chapter}{Die Buchreihe}
 
+\noindent
+\textit{Robotik entwickeln lernen} führt Schritt für Schritt von der
+Entwicklungsumgebung bis zur autonomen Robotik.
+Der rote Faden durch alle Bände: \textbf{robotik-uno-q} --
+Arduino~UNO~Q, L298N-Motorbrücke, HC-SR04-Dual-Sensor.
+Band~1 richtet die Werkstatt ein. Bände~2--3 programmieren ihn
+in Python und C++. Bände~4--5 bringen Navigation und Bildverarbeitung.
+Bände~6--7 liefern die Mathematik, die dahintersteckt.
+
+\bigskip
+
 \begin{center}
-\begin{tabular}{cll}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{clll}
 \hline
-\textbf{Band} & \textbf{Titel} & \textbf{Schwerpunkt} \\
+\textbf{Band} & \textbf{Titel} & \textbf{Schwerpunkt} & \textbf{Technologie} \\
 \hline
-1 & Die Robotik-Werkstatt  & Linux, Docker, Entwicklungswerkzeuge \\
-2 & Python für Robotik und ROS2 & Python, rclpy, autonome Navigation \\
-3 & C++ für Robotik und ROS2   & C++17, rclcpp, Lifecycle Nodes \\
-4 & ROS2 vertieft              & SLAM, Nav2, micro-ROS \\
-5 & Embedded AI                & OpenCV, YOLO, Edge-Deployment \\
-6 & Mathematik I               & Mobile Roboter, Kinematik \\
-7 & Mathematik II              & Manipulatoren, Dynamik \\
+1 & Die Robotik-Werkstatt       & Linux, Docker, Werkzeuge    & Bash, Serial, Git \\
+2 & Python für Robotik und ROS2 & rclpy, Navigation           & Python~3, rclpy \\
+3 & C++ für Robotik und ROS2    & rclcpp, Lifecycle, Echtzeit & C++17, rclcpp \\
+4 & ROS2 vertieft               & SLAM, Nav2, micro-ROS       & ROS2 Jazzy \\
+5 & Embedded AI                 & Bildverarbeitung, YOLO      & OpenCV, Python \\
+6 & Mathematik I                & Mobile Roboter, Kinematik   & SE(2), Odometrie \\
+7 & Mathematik II               & Manipulatoren, Dynamik      & SE(3), Jacobi \\
 \hline
 \end{tabular}
 \end{center}
 
-\bigskip
-
-\textbf{Der rote Faden:} Alle Bände bauen auf demselben Roboter auf --
-\texttt{robotik-uno-q} (Arduino~UNO, L298N, HC-SR04-Dual-Sensor).
-Band~1 richtet die Werkstatt ein.
-Bände 2--3 programmieren den Roboter in Python und C++.
-Bände 4--5 erweitern ihn um Navigation, SLAM und Bildverarbeitung.
-Bände 6--7 liefern die mathematischen Grundlagen,
-die hinter allem stecken.
+\bigskip\noindent
+\textbf{Dieser Band:} Band~\BandNummer{} -- \textit{\BandTitel}.
 
 \newpage
