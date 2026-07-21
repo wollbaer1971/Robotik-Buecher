@@ -1,0 +1,602 @@
+%% ============================================================
+%% Teil I: C++ kompakt – was rclcpp wirklich voraussetzt
+%% Band 3 – Kapitel 1 bis 4
+%% ============================================================
+
+\part{C++ kompakt}
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen C++ kompilieren – CMake und das ROS2-Build-System}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst den Unterschied zwischen kompilierter und
+interpretierter Sprache, kannst ein C++-Programm mit g++
+und mit CMake bauen und weißt, was ament\_cmake für ROS2 tut.
+\end{lernziele}
+
+\section{Situation}
+
+In Python schreibst du \texttt{python3 sensor\_bridge.py} -- fertig.
+In C++ schreibst du \texttt{motor\_node.cpp},
+dann \texttt{g++ motor\_node.cpp -o motor\_node},
+dann \texttt{./motor\_node}.
+Und für ROS2 kommt CMake noch dazu.
+Warum so viele Schritte?
+
+\begin{aufgabeBox}
+Kompiliere ein minimales C++-Programm mit g++ direkt,
+dann mit CMake, und verstehe, was \texttt{CMakeLists.txt}
+für ein ROS2-Paket tut.
+\end{aufgabeBox}
+
+\section{Kompiliert vs. interpretiert}
+
+\begin{wissenBox}
+Python übersetzt deinen Code Zeile für Zeile beim Ausführen (Interpreter).
+C++ übersetzt deinen Code \emph{vor} der Ausführung in Maschinencode (Compiler).
+
+\begin{center}
+\begin{tabular}{lll}
+\hline
+\textbf{} & \textbf{Python} & \textbf{C++} \\
+\hline
+Ausführung & Interpreter zur Laufzeit & direkte CPU-Instruktionen \\
+Fehler & zur Laufzeit sichtbar & schon beim Kompilieren \\
+Geschwindigkeit & 10--100$\times$ langsamer & Referenzwert \\
+Typfehler & zur Laufzeit (ohne mypy) & immer beim Kompilieren \\
+Speicher & automatisch (GC) & manuell / Smart Pointer \\
+\hline
+\end{tabular}
+\end{center}
+
+Für \texttt{motor\_node}: Python-Overhead bei der Serial-Kommunikation
+spielt kaum eine Rolle. Aber für einen Impedanzregler,
+der 1000 Mal pro Sekunde Matrix-Operationen durchführt,
+ist C++ der einzig richtige Weg.
+\end{wissenBox}
+
+\subsection{Drei Schritte vom Quelltext zum Programm}
+
+\begin{lstlisting}[style=cpp]
+// hallo.cpp -- das kleinste C++-Programm
+#include <iostream>
+
+int main() {
+    std::cout << "Hallo ROS2-Welt!" << std::endl;
+    return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# Schritt 1: Kompilieren (Quelltext -> Objektdatei)
+g++ -c hallo.cpp -o hallo.o
+
+# Schritt 2: Linken (Objektdatei + Bibliotheken -> Programm)
+g++ hallo.o -o hallo
+
+# Oder in einem Schritt:
+g++ -std=c++17 hallo.cpp -o hallo
+./hallo
+# Hallo ROS2-Welt!
+\end{lstlisting}
+
+\subsection{CMake -- der Build-Orchestrator}
+
+\begin{lstlisting}[style=cmake]
+# CMakeLists.txt -- minimal
+cmake_minimum_required(VERSION 3.8)
+project(hallo_welt)
+
+# C++17 einschalten
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Executable definieren
+add_executable(hallo hallo.cpp)
+\end{lstlisting}
+
+\begin{lstlisting}[language=bash]
+# CMake-Build
+mkdir build && cd build
+cmake ..
+make
+./hallo
+\end{lstlisting}
+
+\subsection{ament\_cmake -- CMake für ROS2}
+
+\texttt{ament\_cmake} ist ein dünner Wrapper über CMake,
+der ROS2-Pakete als Abhängigkeiten kennt
+und \texttt{colcon} als Build-Frontend nutzt.
+
+\begin{lstlisting}[style=cmake]
+# CMakeLists.txt für ein ROS2-C++-Paket
+cmake_minimum_required(VERSION 3.8)
+project(robotik_uno_q_cpp)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# ament_cmake: Basis-ROS2-Build-System
+find_package(ament_cmake REQUIRED)
+# rclcpp: C++ ROS2-Bibliothek
+find_package(rclcpp REQUIRED)
+# Nachrichtentypen
+find_package(geometry_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+
+# Executable
+add_executable(motor_node src/motor_node.cpp)
+ament_target_dependencies(motor_node
+    rclcpp geometry_msgs std_srvs)
+
+# Installationspfad
+install(TARGETS motor_node
+    DESTINATION lib/${PROJECT_NAME})
+
+ament_package()
+\end{lstlisting}
+
+\begin{loesungBox}
+\begin{lstlisting}[language=bash]
+# Schritt-für-Schritt: erstes ROS2-C++-Paket
+cd ~/ros2_ws/src
+ros2 pkg create --build-type ament_cmake robotik_uno_q_cpp \
+    --dependencies rclcpp geometry_msgs std_srvs
+
+# Zeigt die erzeugte Struktur:
+tree robotik_uno_q_cpp/
+# robotik_uno_q_cpp/
+# ├── CMakeLists.txt
+# ├── package.xml
+# ├── include/robotik_uno_q_cpp/
+# └── src/
+
+colcon build --packages-select robotik_uno_q_cpp
+source install/setup.bash
+\end{lstlisting}
+\end{loesungBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} C++-Paket \texttt{robotik\_uno\_q\_cpp} erstellt und gebaut.\\
+\textbf{Nächstes Kapitel:} Smart Pointer und Klassen -- Grundlage für rclcpp.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:} \texttt{find\_package(rclcpp REQUIRED)} holt rclcpp.
+\texttt{ament\_target\_dependencies()} verknüpft Abhängigkeiten mit dem Executable.
+\texttt{ament\_package()} muss die letzte Zeile sein.
+\texttt{colcon build} baut, \texttt{source install/setup.bash} macht den Node sichtbar.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{find\_package} vor \texttt{ament\_cmake}: Reihenfolge erzwungen --
+  \texttt{ament\_cmake} muss als Erstes kommen.
+\item \texttt{ament\_package()} fehlt: \texttt{colcon} findet das Paket nicht.
+\item Header-Dateien in \texttt{src/} statt \texttt{include/}: funktioniert,
+  aber verletzt ROS2-Konvention.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{haubeBox}
+\textbf{Warum colcon statt make direkt?}
+
+\texttt{colcon} (Collective Construction) verwaltet
+Abhängigkeiten zwischen Paketen im Workspace.
+Es baut Pakete in der richtigen Reihenfolge --
+erst \texttt{rclcpp}, dann dein Paket, das rclcpp braucht.
+\texttt{make} kennt nur das eine Paket, das du gerade baust.
+In einem Workspace mit 20 Paketen wäre manuelles Reihenfolge-Management
+ein Albtraum.
+\end{haubeBox}
+
+\begin{robotikBox}
+Das offizielle \texttt{ros2\_control}-Paket
+(Industriestandard für Motorsteuerung) ist in C++ geschrieben
+und nutzt exakt dieses CMake-Muster.
+Wer \texttt{CMakeLists.txt} für \texttt{motor\_node} versteht,
+versteht auch, wie \texttt{ros2\_control} gebaut wird.
+\end{robotikBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen Speicher sicher verwalten –
+  Smart Pointer und RAII}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst, warum rclcpp fast ausschließlich
+\texttt{std::shared\_ptr} verwendet,
+kannst RAII erklären und weißt,
+warum \texttt{new}/\texttt{delete} in modernem ROS2-Code nicht auftaucht.
+\end{lernziele}
+
+\section{Situation}
+
+rclcpp-Code sieht so aus:
+
+\begin{lstlisting}[style=cpp]
+auto node = std::make_shared<MotorNode>();
+rclcpp::spin(node);
+\end{lstlisting}
+
+Warum \texttt{make\_shared}? Was ist ein \texttt{shared\_ptr}?
+Und warum nicht einfach \texttt{new MotorNode()}?
+
+\begin{aufgabeBox}
+Verstehe Smart Pointer (\texttt{shared\_ptr}, \texttt{unique\_ptr})
+und das RAII-Prinzip, damit du rclcpp-Code lesen und schreiben kannst.
+\end{aufgabeBox}
+
+\section{Das Problem mit rohen Zeigern}
+
+\begin{wissenBox}
+In klassischem C++ reservierst du Speicher mit \texttt{new}
+und gibst ihn mit \texttt{delete} wieder frei.
+Das ist fehleranfällig:
+
+\begin{lstlisting}[style=cpp]
+// Klassisch -- gefährlich
+MotorNode* node = new MotorNode();
+rclcpp::spin(node);
+// Was, wenn spin() eine Exception wirft?
+delete node;  // wird eventuell nie erreicht -- Memory Leak!
+\end{lstlisting}
+
+\textbf{Smart Pointer lösen das Problem:}
+
+\begin{lstlisting}[style=cpp]
+// Modern -- sicher
+auto node = std::make_shared<MotorNode>();
+rclcpp::spin(node);
+// Wenn spin() endet oder eine Exception wirft:
+// node's Destruktor läuft automatisch -- kein Memory Leak
+\end{lstlisting}
+\end{wissenBox}
+
+\subsection{shared\_ptr -- gemeinsamer Besitz}
+
+\begin{lstlisting}[style=cpp]
+#include <memory>
+#include <iostream>
+
+class Serial {
+public:
+    Serial(const std::string& port) {
+        std::cout << "Port " << port << " geoeffnet\n";
+    }
+    ~Serial() {
+        std::cout << "Port geschlossen\n";
+    }
+};
+
+{   // Neuer Scope
+    auto ser1 = std::make_shared<Serial>("/dev/arduino");
+    // Referenzzähler: 1
+    {
+        auto ser2 = ser1;   // Kopie des shared_ptr
+        // Referenzzähler: 2
+        // ser2 wird hier zerstört:
+    }
+    // Referenzzähler: 1 -- Serial lebt noch
+}
+// Referenzzähler: 0 -- ~Serial() wird aufgerufen
+\end{lstlisting}
+
+rclcpp verwendet \texttt{shared\_ptr} überall,
+weil Nodes, Publisher und Subscriber
+von mehreren Stellen gleichzeitig referenziert werden.
+
+\subsection{unique\_ptr -- exklusiver Besitz}
+
+\begin{lstlisting}[style=cpp]
+// unique_ptr: nur ein Besitzer
+auto serial = std::make_unique<Serial>("/dev/arduino");
+// serial kann nicht kopiert werden, nur verschoben:
+auto serial2 = std::move(serial);  // serial ist jetzt nullptr
+\end{lstlisting}
+
+\textbf{Faustregel:}
+\texttt{unique\_ptr} für interne Ressourcen eines Nodes
+(Serial-Port, Puffer).
+\texttt{shared\_ptr} für Nodes selbst (rclcpp erwartet das).
+
+\subsection{RAII -- Resource Acquisition Is Initialization}
+
+\begin{lstlisting}[style=cpp]
+class SerialPort {
+public:
+    // Konstruktor: Ressource öffnen
+    explicit SerialPort(const std::string& port, int baud)
+        : port_(port) {
+        // Hier: Serial öffnen
+        offen_ = true;
+        std::cout << "Port " << port << " @ " << baud << " Baud\n";
+    }
+    // Destruktor: Ressource schließen -- automatisch
+    ~SerialPort() {
+        if (offen_) {
+            std::cout << "Port " << port_ << " geschlossen\n";
+        }
+    }
+    // Kein Kopieren erlaubt
+    SerialPort(const SerialPort&) = delete;
+    SerialPort& operator=(const SerialPort&) = delete;
+
+private:
+    std::string port_;
+    bool offen_{false};
+};
+\end{lstlisting}
+
+RAII bedeutet: Die Ressource wird im Konstruktor geöffnet
+und im Destruktor geschlossen -- automatisch, auch bei Exceptions.
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} RAII-Konzept und Smart Pointer verstanden --
+Grundlage für den \texttt{MotorNode}.\\
+\textbf{Nächstes Kapitel:} Lambda, Templates und modernes C++17.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+Kein \texttt{new}/\texttt{delete} in modernem C++.
+\texttt{make\_shared<T>(args)} für geteilten Besitz (rclcpp-Nodes).
+\texttt{make\_unique<T>(args)} für exklusiven Besitz (interne Ressourcen).
+RAII: Konstruktor öffnet, Destruktor schließt -- immer, auch bei Exceptions.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{shared\_ptr} auf Stack-Objekte: Destruktor läuft zweimal.
+  Immer \texttt{make\_shared} verwenden.
+\item Zirkuläre \texttt{shared\_ptr}: A hält B, B hält A → Memory Leak.
+  Lösung: schwache Referenz (\texttt{weak\_ptr}) für eine Richtung.
+\item \texttt{unique\_ptr} kopieren: Compiler-Fehler.
+  \texttt{std::move(ptr)} für Eigentumsübertragung.
+\end{itemize}
+\end{fehlerBox}
+
+\begin{haubeBox}
+\textbf{Warum rclcpp auf shared\_ptr setzt}
+
+rclcpp muss Nodes, Publisher und Subscriber registrieren
+und intern referenzieren -- auch nachdem der Aufrufer
+seinen Pointer verloren hat.
+\texttt{shared\_ptr} garantiert: Der Node lebt, solange rclcpp ihn braucht.
+Python löst das mit dem Garbage Collector.
+C++ löst es mit \texttt{shared\_ptr} -- explizit, aber vorhersagbar.
+\end{haubeBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen modernen C++-Code lesen –
+  auto, Lambda und Templates}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du kannst \texttt{auto}, Lambda-Ausdrücke und Template-Funktionen
+in rclcpp-Code lesen und schreiben --
+diese drei Features tauchen in fast jeder rclcpp-Zeile auf.
+\end{lernziele}
+
+\section{Situation}
+
+rclcpp-Code enthält oft Zeilen wie:
+
+\begin{lstlisting}[style=cpp]
+auto sub = this->create_subscription<sensor_msgs::msg::Range>(
+    "/sensor/rechts", 10,
+    [this](const sensor_msgs::msg::Range::SharedPtr msg) {
+        this->_cb_rechts(msg);
+    });
+\end{lstlisting}
+
+Drei Dinge auf einmal: \texttt{auto}, Template mit \texttt{<>}
+und Lambda mit \texttt{[this](...)\{...\}}.
+Ohne Verständnis dieser Features ist rclcpp-Code unlesbar.
+
+\begin{aufgabeBox}
+Verstehe \texttt{auto}, Lambda und Templates so weit,
+dass du jeden rclcpp-Subscriber und -Publisher selbst schreiben kannst.
+\end{aufgabeBox}
+
+\section{auto -- Typ-Inferenz}
+
+\begin{lstlisting}[style=cpp]
+// Ohne auto: ausführlich
+std::shared_ptr<rclcpp::Publisher<geometry_msgs::msg::Twist>> pub;
+
+// Mit auto: kompakter, aber identisch
+auto pub = this->create_publisher<geometry_msgs::msg::Twist>(
+    "/cmd_vel", 10);
+// Der Compiler leitet den Typ aus dem Rückgabewert ab
+\end{lstlisting}
+
+\texttt{auto} ist kein dynamischer Typ wie Python's Typsystem.
+Der Typ wird beim Kompilieren fest fixiert --
+\texttt{auto} ist syntaktischer Zucker,
+kein Laufzeit-Feature.
+
+\section{Lambda -- anonyme Funktionen}
+
+\begin{lstlisting}[style=cpp]
+// Lambda-Syntax:  [capture](parameter) -> rückgabetyp { body }
+auto add = [](int a, int b) -> int { return a + b; };
+add(3, 4);   // -> 7
+
+// [this]: Zugriff auf Klassenmitglieder
+class MotorNode : public rclcpp::Node {
+    void _richte_subscriber_ein() {
+        sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+            "/cmd_vel", 10,
+            [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+                // 'this' ist verfügbar dank [this]-Capture
+                this->_verarbeite_twist(msg);
+            });
+    }
+};
+\end{lstlisting}
+
+\section{Templates -- generischer Code}
+
+\begin{lstlisting}[style=cpp]
+// Template-Funktion: funktioniert für jeden Typ T
+template<typename T>
+T klemme(T wert, T min_val, T max_val) {
+    return std::max(min_val, std::min(wert, max_val));
+}
+
+klemme(87, 0, 100);   // int: 87
+klemme(4.5f, 0.0f, 4.0f);  // float: 4.0
+
+// rclcpp-Publisher ist eine Template-Klasse:
+// create_publisher<T>(topic, qos)
+// T ist der Nachrichtentyp -- wird zur Kompilierzeit eingesetzt
+auto pub = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+\end{lstlisting}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} \texttt{auto}, Lambda und Templates lesbar --
+rclcpp-Code wird verständlich.\\
+\textbf{Nächstes Kapitel:} Multithreading -- \texttt{std::thread} und Mutexe.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{auto} spart Tipparbeit, ändert aber nichts am Typ.
+Lambda \texttt{[this](...)\{...\}} ist eine anonyme Funktion
+mit Zugriff auf \texttt{this}.
+\texttt{template<typename T>} macht Code für beliebige Typen verwendbar.
+Alle drei sind in rclcpp allgegenwärtig.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item \texttt{[this]} vergessen: Zugriff auf Klassenmitglieder
+  ergibt Compiler-Fehler (\texttt{this} nicht im Scope des Lambda).
+\item \texttt{auto} bei Referenzen:
+  \texttt{auto x = obj.get\_wert()} kopiert den Wert.
+  \texttt{auto\& x = ...} ist die Referenz.
+\item Template-Fehler: Compiler-Meldungen bei Templates sind
+  oft sehr lang -- immer nur die erste Zeile lesen,
+  die den eigentlichen Fehler nennt.
+\end{itemize}
+\end{fehlerBox}
+
+
+% ─────────────────────────────────────────────────────────────
+\chapter{Wir wollen parallel arbeiten –
+  Multithreading in rclcpp}
+% ─────────────────────────────────────────────────────────────
+
+\begin{lernziele}
+Du verstehst \texttt{std::thread}, \texttt{std::mutex} und
+\texttt{std::atomic}, weißt wann der \texttt{MultiThreadedExecutor}
+nötig ist und implementierst den Serial-Lese-Thread
+im \texttt{motor\_node} korrekt.
+\end{lernziele}
+
+\section{Situation}
+
+\texttt{motor\_node} soll gleichzeitig:
+\begin{enumerate}
+\item \texttt{/cmd\_vel}-Nachrichten empfangen (Subscriber-Callback)
+\item Bestätigungen vom Arduino lesen (Serial-Polling)
+\end{enumerate}
+
+Mit \texttt{SingleThreadedExecutor} blockiert Serial-Polling
+alle anderen Callbacks. Das braucht einen zweiten Thread.
+
+\begin{aufgabeBox}
+Implementiere einen Hintergrund-Thread für Serial-Polling
+im \texttt{motor\_node}, der sicher auf gemeinsame Daten zugreift.
+\end{aufgabeBox}
+
+\section{std::thread und std::mutex}
+
+\begin{lstlisting}[style=cpp]
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <string>
+
+class MotorNode : public rclcpp::Node {
+public:
+    MotorNode() : Node("motor") {
+        laufe_.store(true);
+        lese_thread_ = std::thread(&MotorNode::_lese_arduino, this);
+    }
+
+    ~MotorNode() {
+        laufe_.store(false);
+        if (lese_thread_.joinable()) {
+            lese_thread_.join();   // Warten bis Thread endet
+        }
+    }
+
+private:
+    std::atomic<bool> laufe_{false};  // thread-sicher ohne Mutex
+    std::thread lese_thread_;
+    std::mutex ser_mutex_;             // Schutz für Serial-Port
+    std::string letzte_antwort_;
+
+    void _lese_arduino() {
+        while (laufe_.load()) {
+            // Serial lesen (blockiert bis Zeile kommt)
+            std::string zeile = _lese_zeile();
+            {
+                std::lock_guard<std::mutex> lock(ser_mutex_);
+                letzte_antwort_ = zeile;
+            }  // lock wird hier automatisch freigegeben (RAII)
+        }
+    }
+
+    // Subscriber-Callback -- läuft im Executor-Thread
+    void _cb_cmd_vel(const geometry_msgs::msg::Twist::SharedPtr msg) {
+        // serial schreiben ist auch mutex-geschützt
+        std::lock_guard<std::mutex> lock(ser_mutex_);
+        _sende_befehl(msg->linear.x, msg->angular.z);
+    }
+};
+\end{lstlisting}
+
+\begin{wissenBox}
+\textbf{std::atomic:} Für einfache Typen (\texttt{bool}, \texttt{int})
+ist \texttt{atomic} schneller als \texttt{mutex} --
+Lesen und Schreiben sind atomar (unteilbar) garantiert.
+
+\textbf{std::lock\_guard:} RAII für Mutex --
+\texttt{lock\_guard} sperrt den Mutex im Konstruktor,
+gibt ihn im Destruktor frei -- auch bei Exceptions.
+Kein \texttt{mutex.unlock()} nötig.
+
+\textbf{Deadlock:} Wenn Thread~A Mutex~1 hält und Mutex~2 wartet,
+und Thread~B Mutex~2 hält und Mutex~1 wartet --
+beide warten ewig. Lösung: Mutexe immer in der gleichen Reihenfolge sperren.
+\end{wissenBox}
+
+\begin{projektBox}[robotik-uno-q -- Projektstand]
+\textbf{Heute:} Multithreading-Grundlagen verstanden.\\
+\textbf{Teil~II:} rclcpp -- die eigentlichen ROS2-Nodes.
+\end{projektBox}
+
+\begin{merksatzBox}
+\textbf{Merksatz:}
+\texttt{std::atomic<bool>} für einfache Flags zwischen Threads.
+\texttt{std::lock\_guard<std::mutex>} für alle anderen gemeinsamen Daten.
+Threads immer mit \texttt{join()} sauber beenden.
+\texttt{MultiThreadedExecutor} für rclcpp-Nodes mit parallelen Callbacks.
+\end{merksatzBox}
+
+\begin{fehlerBox}
+\begin{itemize}
+\item Shared Data ohne Mutex: Data Race -- undefiniertes Verhalten,
+  nicht reproduzierbar, schwerste Kategorie von Bugs.
+\item Thread-Destruktor ohne \texttt{join()}: \texttt{std::terminate()} --
+  das Programm bricht ab.
+\item \texttt{mutex.lock()} ohne \texttt{unlock()} (statt \texttt{lock\_guard}):
+  Deadlock beim zweiten Aufruf.
+\end{itemize}
+\end{fehlerBox}
