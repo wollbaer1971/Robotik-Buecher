@@ -1,22 +1,35 @@
-% ============================================================
-% shared/frontmatter.tex
-% Serienübergreifender Inhalt: Bandreihen-Übersicht
-% Eingebunden von ALLEN Bänden nach dem bandspezifischen Inhalt
-% ============================================================
+%% ============================================================
+%% shared/frontmatter.tex – Bandreihen-Übersicht
+%% Wird von allen Bänden via \input{../shared/frontmatter.tex} eingebunden
+%% ============================================================
 
-\section*{Die Buchreihe}
+\chapter*{Die Buchreihe}
+\addcontentsline{toc}{chapter}{Die Buchreihe}
 
 \begin{center}
-\begin{tabular}{lll}
-\toprule
+\begin{tabular}{cll}
+\hline
 \textbf{Band} & \textbf{Titel} & \textbf{Schwerpunkt} \\
-\midrule
-Band 1 & Die Robotik-Werkstatt & Linux, Docker, Entwicklungswerkzeuge \\
-Band 2 & Python für Robotik    & Python-Grundlagen bis ROS2-Einstieg   \\
-Band 3 & ROS2 vertieft         & Navigation, Sensorfusion, Docker       \\
-Band 4 & Embedded AI           & OpenCV, YOLO, Edge-Deployment          \\
-Band 5 & Mathematik I          & Mobile Roboter, Kinematik              \\
-Band 6 & Mathematik II         & Manipulatoren, Dynamik                 \\
-\bottomrule
+\hline
+1 & Die Robotik-Werkstatt  & Linux, Docker, Entwicklungswerkzeuge \\
+2 & Python für Robotik und ROS2 & Python, rclpy, autonome Navigation \\
+3 & C++ für Robotik und ROS2   & C++17, rclcpp, Lifecycle Nodes \\
+4 & ROS2 vertieft              & SLAM, Nav2, micro-ROS \\
+5 & Embedded AI                & OpenCV, YOLO, Edge-Deployment \\
+6 & Mathematik I               & Mobile Roboter, Kinematik \\
+7 & Mathematik II              & Manipulatoren, Dynamik \\
+\hline
 \end{tabular}
 \end{center}
+
+\bigskip
+
+\textbf{Der rote Faden:} Alle Bände bauen auf demselben Roboter auf --
+\texttt{robotik-uno-q} (Arduino~UNO, L298N, HC-SR04-Dual-Sensor).
+Band~1 richtet die Werkstatt ein.
+Bände 2--3 programmieren den Roboter in Python und C++.
+Bände 4--5 erweitern ihn um Navigation, SLAM und Bildverarbeitung.
+Bände 6--7 liefern die mathematischen Grundlagen,
+die hinter allem stecken.
+
+\newpage
