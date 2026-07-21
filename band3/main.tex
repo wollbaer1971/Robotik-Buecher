@@ -1,31 +1,116 @@
-\documentclass[
-  11pt,
-  twoside,
-  parskip=half, headings=normal,
-  bibliography=totoc, listof=totoc
-]{scrbook}
+% !TeX program = pdflatex
+% Band 3: C++ für Robotik und ROS2
+% Compiler: pdfLaTeX (Overleaf: Menu → Compiler → pdfLaTeX)
+% Main document: band3/main.tex
 
-% Gemeinsame Konfiguration (pdfLaTeX, KDP-Format)
-\input{../shared/preamble}
+\documentclass[12pt,a5paper]{book}
 
-% Band-spezifische Variablen
-\newcommand{\BandTitel}{ROS2 vertieft}
-\newcommand{\BandUntertitel}{Navigation, Sensorfusion und Docker}
+% ─────────────────────────────────────────────────────────────
+%  Gemeinsame Präambel (Bände 2–4)
+% ─────────────────────────────────────────────────────────────
+\input{../shared/preamble.tex}
+
+% ─────────────────────────────────────────────────────────────
+%  Band-Variablen
+% ─────────────────────────────────────────────────────────────
+\newcommand{\BuchReihe}{Robotik entwickeln lernen}
+\newcommand{\BandTitel}{C++ für Robotik und ROS2}
+\newcommand{\BandUntertitel}{Von CMake bis rclcpp -- Hochleistungs-Nodes selbst bauen}
 \newcommand{\BandNummer}{3}
+\newcommand{\BandAutor}{Wolfgang Becker}
+\newcommand{\BandVersion}{Erste Auflage}
 
+% ─────────────────────────────────────────────────────────────
+%  Band-3-spezifisch: C++-Listings
+% ─────────────────────────────────────────────────────────────
+\lstdefinestyle{cpp}{
+  language=[11]C++,
+  morekeywords={auto,nullptr,override,final,noexcept,
+                constexpr,static_assert,decltype,
+                std,make_shared,shared_ptr,unique_ptr,
+                rclcpp,Node,Publisher,Subscription,
+                sensor_msgs,geometry_msgs,std_srvs},
+  keywordstyle=\color{blue!80!black}\bfseries,
+  stringstyle=\color{orange!80!black},
+  commentstyle=\color{gray}\itshape,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=true,
+}
+\lstdefinestyle{cmake}{
+  language=make,
+  morekeywords={cmake_minimum_required,project,find_package,
+                ament_cmake,add_executable,ament_target_dependencies,
+                install,TARGETS,DESTINATION,target_include_directories,
+                target_compile_features},
+  keywordstyle=\color{teal}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  showstringspaces=false,
+  breaklines=true,
+}
+\lstset{style=cpp}  % C++ ist Default in Band 3
+
+% ─────────────────────────────────────────────────────────────
+%  Vorwort-Text für Band 3
+% ─────────────────────────────────────────────────────────────
+\newcommand{\BandVorwort}{%
+Band~2 hat gezeigt, wie Python und rclpy zusammenspielen.
+Jetzt kommt C++.
+
+Warum? Drei Gründe.
+Erstens: rclcpp ist die performantere Wahl -- Motor-Nodes,
+die PWM-Werte berechnen und Serial-Pakete senden,
+profitieren von geringerer Latenz und vorhersagbarem Speicherverhalten.
+Zweitens: Die meisten ROS2-Pakete in der Industrie sind in C++ geschrieben --
+Nav2, ros2\_control, MoveIt2. Wer sie anpassen will, braucht C++.
+Drittens: Lifecycle~Nodes gibt es nur in rclcpp in voller Ausprägung --
+managed State Machine, configure/activate/deactivate,
+das ist der Standard für sichere Robotik-Software.
+
+Dieser Band ist kein vollständiges C++-Buch.
+Er deckt C++17-Features ab, die rclcpp braucht:
+Smart Pointer, Lambda, Templates, Multithreading.
+Wer C++-Grundlagen noch nicht kennt, liest parallel ein Standardwerk
+(z.\,B. Stroustrup: \textit{The C++ Programming Language}).
+Wer sie kennt, überfliegt Teil~I und taucht direkt in rclcpp ein.
+
+Am Ende dieses Bandes läuft \texttt{motor\_node} als C++-Lifecycle-Node
+neben den Python-Nodes aus Band~2 -- im selben ROS2-Stack.
+}
+
+% ─────────────────────────────────────────────────────────────
+%  Dokument
+% ─────────────────────────────────────────────────────────────
 \begin{document}
 
+\input{../shared/titelseite.tex}
+
 \frontmatter
-\input{../shared/titelseite}
-
 \chapter*{Vorwort}
-Dieser Band ist in Vorbereitung.
-
-\input{../shared/frontmatter}
+\BandVorwort
+\newpage
+\input{../shared/frontmatter.tex}
 \tableofcontents
 
 \mainmatter
-\input{chapters/frontmatter}
+
+\input{chapters/teil1_cpp_kompakt.tex}
+\input{chapters/teil2_rclcpp.tex}
+\input{chapters/teil3_echtzeit.tex}
+\input{chapters/teil4_projekt.tex}
 
 \backmatter
+\appendix
+\chapter{C++-Schnellreferenz für ROS2}
+\label{app:quickref}
+% Wird in Folgeversion ergänzt
+
+\chapter{CMakeLists.txt-Vorlage}
+\label{app:cmake}
+% Wird in Folgeversion ergänzt
+
+\chapter{rclcpp-API-Übersicht}
+\label{app:rclcpp}
+% Wird in Folgeversion ergänzt
+
 \end{document}
